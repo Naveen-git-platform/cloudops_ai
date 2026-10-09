@@ -19,6 +19,22 @@ jobs:
       run:
         working-directory: backend
 
+    services:
+      postgres:
+        image: postgres:16
+        # Throwaway credentials for the ephemeral CI database only.
+        env:
+          POSTGRES_USER: cloudops
+          POSTGRES_PASSWORD: cloudops_ci
+          POSTGRES_DB: cloudops_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cloudops -d cloudops_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -35,5 +51,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
 
-      - name: Run tests
+      - name: Run tests against PostgreSQL
+        env:
+          TEST_DATABASE_URL: postgresql+psycopg://cloudops:cloudops_ci@127.0.0.1:5432/cloudops_test
         run: python -m pytest

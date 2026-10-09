@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.models.enums import IntegrationStatus, IntegrationType
 
@@ -10,6 +10,8 @@ class Integration(BaseModel):
 
     Holds metadata only; credentials and live connections arrive in later issues.
     """
+
+    model_config = ConfigDict(from_attributes=True)
 
     id: str
     name: str
