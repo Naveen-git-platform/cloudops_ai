@@ -1,10 +1,11 @@
 # CloudOps AI — Backend
 
-FastAPI service for the CloudOps AI platform.
+FastAPI service for the CloudOps AI platform. Services and integrations are stored in PostgreSQL.
 
 ## Requirements
 
-- Python 3.10+
+- Python 3.12+
+- PostgreSQL 14+ (local install or container)
 
 ## Setup
 
@@ -19,6 +20,38 @@ source .venv/bin/activate
 
 pip install -r requirements.txt
 ```
+
+## Local PostgreSQL
+
+Create a database and a user for local development. With `psql` connected as a superuser:
+
+```sql
+CREATE USER cloudops WITH PASSWORD 'choose-a-local-password';
+CREATE DATABASE cloudops OWNER cloudops;
+-- Optional, for running the tests against PostgreSQL:
+CREATE DATABASE cloudops_test OWNER cloudops;
+```
+
+Or run PostgreSQL in a container:
+
+```bash
+docker run --name cloudops-postgres -d -p 5432:5432 \
+  -e POSTGRES_USER=cloudops -e POSTGRES_PASSWORD=choose-a-local-password -e POSTGRES_DB=cloudops \
+  postgres:16
+```
+
+Tables are created automatically when the API starts (see `DATABASE_AUTO_CREATE`).
+
+## Configuration
+
+Settings come from environment variables. For local development, copy `.env.example` to `.env` (it is git-ignored) and fill in your values. Credentials are never hardcoded; the API refuses to start without `DATABASE_URL`.
+
+| Variable               | Required | Default | Description                                                                                                     |
+| ---------------------- | -------- | ------- | --------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`         | Yes      | —       | SQLAlchemy URL, e.g. `postgresql+psycopg://cloudops:<password>@localhost:5432/cloudops`                          |
+| `DATABASE_ECHO`        | No       | `false` | Log every SQL statement                                                                                         |
+| `DATABASE_AUTO_CREATE` | No       | `true`  | Create missing tables on startup. Existing tables are not altered; schema migrations will come in a later issue |
+| `TEST_DATABASE_URL`    | No       | —       | Database for the test suite (see below)                                                                         |
 
 ## Run the API
 
@@ -42,11 +75,9 @@ Response:
 
 ## Service registry
 
-Services and their integrations (Stripe, PostgreSQL, GitHub, ...) are stored **in memory** for now, so data resets when the server restarts. PostgreSQL storage comes in a later issue.
-
 | Method | Path                              | Description                                         |
 | ------ | --------------------------------- | --------------------------------------------------- |
-| GET    | `/services`                       | List services                                       |
+| GET    | `/services`                       | List services (oldest first)                        |
 | GET    | `/services/{service_id}`          | Get one service (404 if unknown)                    |
 | POST   | `/services`                       | Create a service (201; 409 if the ID exists)        |
 | GET    | `/integrations?service_id=...`    | List integrations, optionally for one service       |
@@ -72,19 +103,20 @@ Allowed values:
 - integration `type`: `github`, `aws`, `kubernetes`, `stripe`, `postgresql`, `redis`, `opentelemetry`, `other`
 - integration `status`: `pending` (default), `connected`, `degraded`, `disconnected`
 
-Full interactive docs are at http://127.0.0.1:8000/docs.
+Integrations store metadata only; no credentials or live connections yet.
 
 ## Project structure
 
 ```
 app/
-  main.py          App factory: routers and error handlers
-  config.py        Service name and version
-  dependencies.py  FastAPI dependency that provides the registry
-  models/          Enums and stored resource models (also used as response models)
+  main.py          App factory: database lifecycle, routers, error handlers
+  config.py        Settings loaded from environment variables
+  dependencies.py  Per-request database session and registry
+  db/              SQLAlchemy engine/session (session.py) and tables (models.py)
+  models/          Enums and API response models
   schemas/         Request bodies and validation rules
   routes/          HTTP endpoints (health, services, integrations)
-  services/        Business logic; registry.py holds the in-memory store
+  services/        Business logic; registry.py reads and writes the database
 tests/
 ```
 
@@ -94,4 +126,13 @@ From the `backend/` directory:
 
 ```bash
 pytest
+```
+
+By default the tests use a temporary SQLite file, so they run without a database server. To run them against PostgreSQL, set `TEST_DATABASE_URL` to a **dedicated test database**. Every test drops and recreates the tables, so never point it at real data.
+
+```bash
+# macOS / Linux
+TEST_DATABASE_URL=postgresql+psycopg://cloudops:<password>@localhost:5432/cloudops_test pytest
+# Windows (PowerShell)
+$env:TEST_DATABASE_URL = "postgresql+psycopg://cloudops:<password>@localhost:5432/cloudops_test"; pytest
 ```

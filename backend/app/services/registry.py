@@ -1,15 +1,16 @@
-"""In-memory service and integration registry.
+"""Service and integration registry backed by the database.
 
-This is the only place that holds state. It will be replaced by a
-PostgreSQL-backed repository in a later issue; routes depend only on the
-public methods below.
+Routes depend only on the public methods below; all SQL lives here.
 """
 
 import re
-from collections.abc import Container
 from datetime import UTC, datetime
-from threading import Lock
 
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from app.db import IntegrationRecord, ServiceRecord
 from app.models import Integration, Service
 from app.schemas import IntegrationCreate, ServiceCreate
 
@@ -38,67 +39,72 @@ def slugify(value: str) -> str:
     return slug[:56].rstrip("-") or "item"
 
 
-def _unique_id(base: str, taken: Container[str]) -> str:
-    candidate, n = base, 2
-    while candidate in taken:
-        candidate, n = f"{base}-{n}", n + 1
-    return candidate
-
-
 class Registry:
-    def __init__(self) -> None:
-        self._services: dict[str, Service] = {}
-        self._integrations: dict[str, Integration] = {}
-        self._lock = Lock()
+    def __init__(self, session: Session) -> None:
+        self._session = session
 
     # Services
 
     def list_services(self) -> list[Service]:
-        return list(self._services.values())
+        rows = self._session.scalars(select(ServiceRecord).order_by(ServiceRecord.created_at, ServiceRecord.id))
+        return [Service.model_validate(row) for row in rows]
 
     def get_service(self, service_id: str) -> Service:
-        try:
-            return self._services[service_id]
-        except KeyError:
-            raise NotFoundError("Service", service_id) from None
+        row = self._session.get(ServiceRecord, service_id)
+        if row is None:
+            raise NotFoundError("Service", service_id)
+        return Service.model_validate(row)
 
     def create_service(self, data: ServiceCreate) -> Service:
-        with self._lock:
-            if data.id is not None and data.id in self._services:
-                raise ConflictError("Service", data.id)
-            service_id = data.id or _unique_id(slugify(data.name), self._services)
-            service = Service(
-                id=service_id,
-                created_at=datetime.now(UTC),
-                **data.model_dump(exclude={"id"}),
-            )
-            self._services[service_id] = service
-            return service
+        if data.id is not None and self._session.get(ServiceRecord, data.id) is not None:
+            raise ConflictError("Service", data.id)
+        service_id = data.id or self._unique_id(ServiceRecord, slugify(data.name))
+        row = ServiceRecord(id=service_id, created_at=datetime.now(UTC), **data.model_dump(exclude={"id"}))
+        self._insert(row, ConflictError("Service", service_id))
+        return Service.model_validate(row)
 
     # Integrations
 
     def list_integrations(self, service_id: str | None = None) -> list[Integration]:
-        items = self._integrations.values()
-        return [i for i in items if service_id is None or i.service_id == service_id]
+        query = select(IntegrationRecord).order_by(IntegrationRecord.created_at, IntegrationRecord.id)
+        if service_id is not None:
+            query = query.where(IntegrationRecord.service_id == service_id)
+        return [Integration.model_validate(row) for row in self._session.scalars(query)]
 
     def get_integration(self, integration_id: str) -> Integration:
-        try:
-            return self._integrations[integration_id]
-        except KeyError:
-            raise NotFoundError("Integration", integration_id) from None
+        row = self._session.get(IntegrationRecord, integration_id)
+        if row is None:
+            raise NotFoundError("Integration", integration_id)
+        return Integration.model_validate(row)
 
     def create_integration(self, data: IntegrationCreate) -> Integration:
-        with self._lock:
-            if data.service_id not in self._services:
-                raise UnknownServiceError(data.service_id)
-            if data.id is not None and data.id in self._integrations:
-                raise ConflictError("Integration", data.id)
-            base = slugify(f"{data.service_id}-{data.type}")
-            integration_id = data.id or _unique_id(base, self._integrations)
-            integration = Integration(
-                id=integration_id,
-                created_at=datetime.now(UTC),
-                **data.model_dump(exclude={"id"}),
-            )
-            self._integrations[integration_id] = integration
-            return integration
+        if self._session.get(ServiceRecord, data.service_id) is None:
+            raise UnknownServiceError(data.service_id)
+        if data.id is not None and self._session.get(IntegrationRecord, data.id) is not None:
+            raise ConflictError("Integration", data.id)
+        base = slugify(f"{data.service_id}-{data.type}")
+        integration_id = data.id or self._unique_id(IntegrationRecord, base)
+        row = IntegrationRecord(id=integration_id, created_at=datetime.now(UTC), **data.model_dump(exclude={"id"}))
+        self._insert(row, ConflictError("Integration", integration_id))
+        return Integration.model_validate(row)
+
+    # Helpers
+
+    def _unique_id(self, model: type[ServiceRecord] | type[IntegrationRecord], base: str) -> str:
+        """`base`, or `base-2`, `base-3`, ... if taken."""
+        taken = set(self._session.scalars(select(model.id).where(model.id.startswith(base, autoescape=True))))
+        candidate, n = base, 2
+        while candidate in taken:
+            candidate, n = f"{base}-{n}", n + 1
+        return candidate
+
+    def _insert(self, row: ServiceRecord | IntegrationRecord, on_conflict: RegistryError) -> None:
+        self._session.add(row)
+        try:
+            self._session.commit()
+        except IntegrityError:
+            # A concurrent request inserted the same ID (or deleted the parent service).
+            self._session.rollback()
+            if isinstance(row, IntegrationRecord) and self._session.get(ServiceRecord, row.service_id) is None:
+                raise UnknownServiceError(row.service_id) from None
+            raise on_conflict from None
