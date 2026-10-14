@@ -21,6 +21,7 @@ export function IncidentList({ incidents, onOpen }: { incidents: Incident[]; onO
   return (
     <Panel
       id="incidents"
+      demo
       title="Incidents"
       description="Select an incident for details and actions"
       className="scroll-mt-20 lg:col-span-2"

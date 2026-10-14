@@ -15,7 +15,7 @@ const kindStyles: Record<ActivityKind, { icon: LucideIcon; tone: string }> = {
 
 export function ActivityTimeline({ events }: { events: ActivityEvent[] }) {
   return (
-    <Panel id="activity" title="Recent activity" description="Deploys, incidents and code changes">
+    <Panel id="activity" title="Recent activity" demo description="Deploys, incidents and code changes">
       <ol className="relative">
         {events.map((event, index) => {
           const { icon: Icon, tone } = kindStyles[event.kind];
