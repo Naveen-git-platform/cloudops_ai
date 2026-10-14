@@ -1,18 +1,12 @@
 /**
  * DEMO DATA — for UI development only.
  *
- * Everything in this file is static sample data. It will be replaced by
- * responses from the FastAPI backend (see lib/api.ts) once the incidents,
- * services, deployments and telemetry endpoints exist.
+ * Static sample data for dashboard sections whose backend endpoints don't
+ * exist yet: incidents, deployments, activity and telemetry. Services and
+ * integrations come from the API (see lib/api.ts). Replace each export here
+ * once its endpoint ships.
  */
-import type {
-  ActivityEvent,
-  DashboardData,
-  Deployment,
-  Incident,
-  Service,
-  TelemetryPoint,
-} from "@/types";
+import type { ActivityEvent, DemoDashboardData, Deployment, Incident, TelemetryPoint } from "@/types";
 
 // Timestamps are fixed relative to a reference time so server and client
 // renders match (no hydration mismatch from Date.now()).
@@ -66,22 +60,6 @@ const incidents: Incident[] = [
   },
 ];
 
-/** Deterministic latency series with an optional spike from index `spikeAt`. */
-const latency = (base: number, spread: number, spikeAt = -1): number[] =>
-  Array.from({ length: 24 }, (_, i) =>
-    Math.round(base + Math.sin(i * 0.9) * spread + (spikeAt >= 0 && i >= spikeAt ? base * 1.6 : 0)),
-  );
-
-const services: Service[] = [
-  { id: "svc-auth", name: "auth-service", status: "healthy", latencyMs: 42, uptimePct: 99.99, latencyHistory: latency(40, 6) },
-  { id: "svc-checkout", name: "checkout-api", status: "down", latencyMs: 1260, uptimePct: 99.12, latencyHistory: latency(180, 30, 19) },
-  { id: "svc-search", name: "search-service", status: "degraded", latencyMs: 840, uptimePct: 99.71, latencyHistory: latency(320, 40, 16) },
-  { id: "svc-catalog", name: "catalog-api", status: "healthy", latencyMs: 68, uptimePct: 99.98, latencyHistory: latency(65, 8) },
-  { id: "svc-orders", name: "order-worker", status: "degraded", latencyMs: 210, uptimePct: 99.85, latencyHistory: latency(120, 20, 20) },
-  { id: "svc-edge", name: "edge-gateway", status: "healthy", latencyMs: 18, uptimePct: 99.995, latencyHistory: latency(18, 3) },
-  { id: "svc-notify", name: "notification-service", status: "healthy", latencyMs: 95, uptimePct: 99.96, latencyHistory: latency(90, 10) },
-];
-
 const deployments: Deployment[] = [
   { id: "dep-879", service: "checkout-api", version: "v3.8.1", environment: "production", status: "in_progress", deployedAt: minutesAgo(8), author: "sam.k" },
   { id: "dep-881", service: "catalog-api", version: "v2.14.0", environment: "production", status: "succeeded", deployedAt: minutesAgo(35), author: "priya.n" },
@@ -103,16 +81,8 @@ const telemetry: TelemetryPoint[] = Array.from({ length: 48 }, (_, i) => ({
   errorRate: Number((0.3 + (i > 42 ? (i - 42) * 1.2 : Math.abs(Math.sin(i / 3)) * 0.4)).toFixed(2)),
 }));
 
-export const demoDashboard: DashboardData = {
-  summary: {
-    activeIncidents: incidents.filter((i) => i.status !== "resolved").length,
-    servicesHealthy: services.filter((s) => s.status === "healthy").length,
-    servicesDegraded: services.filter((s) => s.status !== "healthy").length,
-    deploymentsLast24h: deployments.length,
-    overallStatus: services.some((s) => s.status === "down") ? "down" : "degraded",
-  },
+export const demoDashboard: DemoDashboardData = {
   incidents,
-  services,
   deployments,
   activity,
   telemetry,

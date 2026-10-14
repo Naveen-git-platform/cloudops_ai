@@ -1,7 +1,7 @@
 "use client";
 
 import { MotionConfig, motion } from "motion/react";
-import { useCallback, useMemo, useState } from "react";
+import { Suspense, use, useCallback, useState } from "react";
 import { ActivityTimeline } from "@/components/activity/activity-timeline";
 import { DeploymentsList } from "@/components/dashboard/deployments-list";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
@@ -14,27 +14,42 @@ import { MobileNav } from "@/components/layout/mobile-nav";
 import { sectionIds } from "@/components/layout/nav-items";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { useActiveSection } from "@/components/layout/use-active-section";
+import { RegistryError } from "@/components/services/registry-states";
 import { ServiceHealthList } from "@/components/services/service-health-list";
 import { DEMO_NOW } from "@/lib/demo-data";
 import { staggerContainer } from "@/lib/motion";
-import type { DashboardData, Incident } from "@/types";
+import { matchesQuery } from "@/lib/search";
+import type { DemoDashboardData, Incident, ServiceRegistryResult } from "@/types";
 
-const matches = (query: string, ...fields: string[]) =>
-  fields.some((f) => f.toLowerCase().includes(query.trim().toLowerCase()));
+/** Overview subtitle with the live service count. */
+function ServiceCount({ registry }: { registry: Promise<ServiceRegistryResult> }) {
+  const result = use(registry);
+  if (!result.ok) return <>Service data is currently unavailable.</>;
+  const n = result.services.length;
+  return <>Tracking {n} registered {n === 1 ? "service" : "services"} from the CloudOps API.</>;
+}
 
-export function DashboardShell({ data }: { data: DashboardData }) {
-  const [incidents, setIncidents] = useState<Incident[]>(data.incidents);
+/** Banner shown above the summary when the API can't be reached; renders nothing otherwise. */
+function RegistryAlert({ registry }: { registry: Promise<ServiceRegistryResult> }) {
+  const result = use(registry);
+  return result.ok ? null : <RegistryError {...result.error} compact />;
+}
+
+interface DashboardShellProps {
+  demo: DemoDashboardData;
+  /** Streamed from the server; see lib/api.ts loadServiceRegistry(). */
+  registry: Promise<ServiceRegistryResult>;
+}
+
+export function DashboardShell({ demo, registry }: DashboardShellProps) {
+  const [incidents, setIncidents] = useState<Incident[]>(demo.incidents);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [navOpen, setNavOpen] = useState(false);
   const activeId = useActiveSection(sectionIds);
 
-  const summary = useMemo(
-    () => ({ ...data.summary, activeIncidents: incidents.filter((i) => i.status !== "resolved").length }),
-    [data.summary, incidents],
-  );
-  const filteredIncidents = incidents.filter((i) => matches(query, i.title, i.service, i.id));
-  const filteredServices = data.services.filter((s) => matches(query, s.name));
+  const activeIncidents = incidents.filter((i) => i.status !== "resolved").length;
+  const filteredIncidents = incidents.filter((i) => matchesQuery(query, i.title, i.service, i.id));
   const selected = incidents.find((i) => i.id === selectedId) ?? null;
 
   const closeDetail = useCallback(() => setSelectedId(null), []);
@@ -68,7 +83,7 @@ export function DashboardShell({ data }: { data: DashboardData }) {
           </div>
           <SidebarNav activeId={activeId} compact layoutScope="desktop" />
           <p className="mt-auto hidden rounded-lg border border-line p-3 text-[11px] leading-relaxed text-faint lg:block">
-            Showing demo data. Live data will come from the CloudOps API.
+            Services and integrations are live from the CloudOps API. Incidents, activity, telemetry and deployments are demo data.
           </p>
         </aside>
 
@@ -98,22 +113,30 @@ export function DashboardShell({ data }: { data: DashboardData }) {
               transition={{ duration: 0.4 }}
             >
               <h1 className="text-xl font-semibold tracking-tight">Overview</h1>
-              <p className="mt-1 text-sm text-muted">Production health across {data.services.length} services in us-east-1.</p>
+              <p className="mt-1 text-sm text-muted">
+                <Suspense fallback="Loading services from the CloudOps API…">
+                  <ServiceCount registry={registry} />
+                </Suspense>
+              </p>
             </motion.div>
 
-            <SummaryCards summary={summary} totalServices={data.services.length} />
+            <Suspense fallback={null}>
+              <RegistryAlert registry={registry} />
+            </Suspense>
+
+            <SummaryCards registry={registry} activeIncidents={activeIncidents} deployments={demo.deployments.length} />
 
             <div className="grid gap-4 lg:grid-cols-3">
               <IncidentList incidents={filteredIncidents} onOpen={setSelectedId} />
-              <ActivityTimeline events={data.activity} />
+              <ActivityTimeline events={demo.activity} />
             </div>
 
             <div className="grid gap-4 lg:grid-cols-3">
-              <SystemHealthChart points={data.telemetry} />
-              <DeploymentsList deployments={data.deployments} />
+              <SystemHealthChart points={demo.telemetry} />
+              <DeploymentsList deployments={demo.deployments} />
             </div>
 
-            <ServiceHealthList services={filteredServices} />
+            <ServiceHealthList registry={registry} query={query} />
           </motion.main>
         </div>
       </div>

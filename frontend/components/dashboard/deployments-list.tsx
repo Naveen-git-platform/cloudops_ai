@@ -10,7 +10,7 @@ import type { Deployment } from "@/types";
 
 export function DeploymentsList({ deployments }: { deployments: Deployment[] }) {
   return (
-    <Panel id="deployments" title="Recent deployments" description="Across all environments" className="scroll-mt-20">
+    <Panel id="deployments" title="Recent deployments" demo description="Across all environments" className="scroll-mt-20">
       <motion.ul variants={staggerContainer} className="divide-y divide-line">
         {deployments.map((d) => {
           const style = deploymentStyles[d.status];

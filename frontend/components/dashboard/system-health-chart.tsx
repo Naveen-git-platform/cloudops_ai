@@ -40,6 +40,7 @@ export function SystemHealthChart({ points }: { points: TelemetryPoint[] }) {
   return (
     <Panel
       id="telemetry"
+      demo
       title="System health"
       description="Request rate and error rate across production, last 24h"
       className="scroll-mt-20 lg:col-span-2"

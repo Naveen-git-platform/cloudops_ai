@@ -1,9 +1,14 @@
 /**
- * Shared domain types. These mirror the shapes the FastAPI backend will
- * return, so components can switch from demo data to API data unchanged.
+ * Shared domain types.
+ *
+ * `Service` and `Integration` mirror the FastAPI responses exactly (snake_case
+ * included). The remaining types describe demo data for sections whose
+ * backend endpoints don't exist yet.
  */
 
 export type HealthStatus = "healthy" | "degraded" | "down";
+/** Service status as stored by the backend; `unknown` until health checks exist. */
+export type ServiceStatus = HealthStatus | "unknown";
 export type Severity = "critical" | "warning" | "resolved";
 export type IncidentStatus = "investigating" | "identified" | "monitoring" | "resolved";
 export type Environment = "production" | "staging" | "development";
@@ -28,17 +33,52 @@ export interface Incident {
   description: string;
 }
 
+/** Response item from GET /services */
 export interface Service {
   id: string;
   name: string;
-  status: HealthStatus;
-  /** p95 latency in milliseconds */
-  latencyMs: number;
-  /** 30-day uptime percentage */
-  uptimePct: number;
-  /** Recent latency samples for the sparkline */
-  latencyHistory: number[];
+  description: string;
+  environment: Environment;
+  status: ServiceStatus;
+  /** ISO 8601 timestamp */
+  created_at: string;
 }
+
+export type IntegrationType =
+  | "github"
+  | "aws"
+  | "kubernetes"
+  | "stripe"
+  | "postgresql"
+  | "redis"
+  | "opentelemetry"
+  | "other";
+
+export type IntegrationStatus = "pending" | "connected" | "degraded" | "disconnected";
+
+/** Response item from GET /integrations */
+export interface Integration {
+  id: string;
+  name: string;
+  type: IntegrationType;
+  status: IntegrationStatus;
+  service_id: string;
+  /** ISO 8601 timestamp */
+  created_at: string;
+}
+
+/**
+ * Result of loading services and integrations from the API. Never rejects, so
+ * it can be streamed to client components and rendered as a loading/error state.
+ */
+export type ServiceRegistryResult =
+  | {
+      ok: true;
+      services: Service[];
+      /** null when GET /integrations failed but services loaded */
+      integrations: Integration[] | null;
+    }
+  | { ok: false; error: { title: string; detail: string } };
 
 export interface Deployment {
   id: string;
@@ -71,18 +111,9 @@ export interface TelemetryPoint {
   errorRate: number;
 }
 
-export interface DashboardSummary {
-  activeIncidents: number;
-  servicesHealthy: number;
-  servicesDegraded: number;
-  deploymentsLast24h: number;
-  overallStatus: HealthStatus;
-}
-
-export interface DashboardData {
-  summary: DashboardSummary;
+/** Demo-only data for sections without backend endpoints yet. */
+export interface DemoDashboardData {
   incidents: Incident[];
-  services: Service[];
   deployments: Deployment[];
   activity: ActivityEvent[];
   telemetry: TelemetryPoint[];
