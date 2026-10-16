@@ -1,0 +1,152 @@
+{
+  "resourceLogs": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "checkout-api"
+            }
+          },
+          {
+            "key": "service.namespace",
+            "value": {
+              "stringValue": "shop"
+            }
+          },
+          {
+            "key": "service.version",
+            "value": {
+              "stringValue": "3.8.1"
+            }
+          },
+          {
+            "key": "deployment.environment.name",
+            "value": {
+              "stringValue": "production"
+            }
+          },
+          {
+            "key": "host.name",
+            "value": {
+              "stringValue": "ip-10-0-1-12"
+            }
+          },
+          {
+            "key": "cloud.provider",
+            "value": {
+              "stringValue": "aws"
+            }
+          },
+          {
+            "key": "cloud.region",
+            "value": {
+              "stringValue": "us-east-1"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "python"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "1.45.0"
+            }
+          }
+        ]
+      },
+      "scopeLogs": [
+        {
+          "scope": {
+            "name": "checkout.payments"
+          },
+          "logRecords": [
+            {
+              "timeUnixNano": "1792065601230000000",
+              "observedTimeUnixNano": "1792065601231000000",
+              "severityNumber": 17,
+              "severityText": "ERROR",
+              "body": {
+                "stringValue": "Payment authorization failed: connection pool exhausted"
+              },
+              "attributes": [
+                {
+                  "key": "exception.type",
+                  "value": {
+                    "stringValue": "psycopg.OperationalError"
+                  }
+                },
+                {
+                  "key": "code.function.name",
+                  "value": {
+                    "stringValue": "authorize_payment"
+                  }
+                }
+              ],
+              "traceId": "5b8efff798038103d269b633813fc60c",
+              "spanId": "eee19b7ec3c1b174",
+              "flags": 1
+            },
+            {
+              "timeUnixNano": "1792065600005000000",
+              "severityNumber": 9,
+              "body": {
+                "stringValue": "Checkout started"
+              },
+              "attributes": [
+                {
+                  "key": "cart.items",
+                  "value": {
+                    "intValue": "3"
+                  }
+                }
+              ],
+              "traceId": "5b8efff798038103d269b633813fc60c",
+              "spanId": "eee19b7ec3c1b174"
+            },
+            {
+              "observedTimeUnixNano": "1792065602000000000",
+              "severityNumber": 13,
+              "severityText": "WARN",
+              "body": {
+                "kvlistValue": {
+                  "values": [
+                    {
+                      "key": "event",
+                      "value": {
+                        "stringValue": "pool_saturation"
+                      }
+                    },
+                    {
+                      "key": "pool.in_use",
+                      "value": {
+                        "intValue": "20"
+                      }
+                    },
+                    {
+                      "key": "pool.max",
+                      "value": {
+                        "intValue": "20"
+                      }
+                    }
+                  ]
+                }
+              },
+              "eventName": "db.pool.saturated"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

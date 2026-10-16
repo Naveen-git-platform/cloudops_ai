@@ -6,8 +6,10 @@ from fastapi.responses import JSONResponse
 
 from app.config import VERSION, Settings, get_settings
 from app.db import Database
+from app.errors import register_error_handlers
 from app.routes import health, integrations, services
 from app.services.registry import ConflictError, NotFoundError, UnknownServiceError
+from app.telemetry.router import router as telemetry_router
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -16,9 +18,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         config = settings or get_settings()
-        database = Database(config.database_url, echo=config.database_echo)
+        database = Database(
+            config.database_url, echo=config.database_echo, connect_timeout=config.database_connect_timeout
+        )
         if config.database_auto_create:
             database.create_tables()
+        app.state.settings = config
         app.state.database = database
         try:
             yield
@@ -30,6 +35,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health.router)
     app.include_router(services.router)
     app.include_router(integrations.router)
+    app.include_router(telemetry_router)
 
     error_codes = {
         NotFoundError: status.HTTP_404_NOT_FOUND,
@@ -42,6 +48,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return JSONResponse(status_code=code, content={"detail": str(exc)})
 
         app.add_exception_handler(error_type, handler)
+
+    register_error_handlers(app)
 
     return app
 

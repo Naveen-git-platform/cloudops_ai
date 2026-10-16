@@ -1,0 +1,2 @@
+# The codebase uses 120-character lines; everything else follows Ruff's defaults.
+line-length = 120
