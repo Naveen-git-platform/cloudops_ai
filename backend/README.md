@@ -26,7 +26,7 @@ pip install -r requirements.txt
 Create a database and a user for local development. With `psql` connected as a superuser:
 
 ```sql
-CREATE USER cloudops WITH PASSWORD 'choose-a-local-password';
+CREATE USER cloudops WITH PASSWORD 'choose-a-local-password' CREATEDB;
 CREATE DATABASE cloudops OWNER cloudops;
 -- Optional, for running the tests against PostgreSQL:
 CREATE DATABASE cloudops_test OWNER cloudops;
@@ -40,7 +40,51 @@ docker run --name cloudops-postgres -d -p 5432:5432 \
   postgres:16
 ```
 
-Tables are created automatically when the API starts (see `DATABASE_AUTO_CREATE`).
+Then create the tables with Alembic (see [Database migrations](#database-migrations)):
+
+```bash
+export DATABASE_URL=postgresql+psycopg://cloudops:<password>@localhost:5432/cloudops   # or put it in .env
+alembic upgrade head
+```
+
+## Database migrations
+
+[Alembic](https://alembic.sqlalchemy.org/) manages the database schema. **PostgreSQL is the migration target**; migrations are written and tested for PostgreSQL only. Run every command from the `backend/` directory. Alembic reads the same `DATABASE_URL` as the API (environment or `.env`); no URL is stored in `alembic.ini`.
+
+| Task | Command |
+| ---- | ------- |
+| Create or update the schema | `alembic upgrade head` |
+| Show the database's revision | `alembic current` |
+| Show all revisions | `alembic history --verbose` |
+| Preview the SQL without running it | `alembic upgrade head --sql` |
+| Step back one revision | `alembic downgrade -1` |
+
+**Fresh database.** Create an empty database (see above), then `alembic upgrade head`.
+
+**Database created before Alembic** (by the API's old automatic table creation). Its schema is already identical to revision `0001`, so record that instead of re-creating tables, then upgrade as usual:
+
+```bash
+alembic stamp 0001
+alembic upgrade head
+```
+
+The API refuses to start if the tables don't match the models, and logs a warning if a PostgreSQL schema has no Alembic version yet.
+
+**Changing the schema.** After editing a model in `app/db/models.py` or `app/telemetry/models.py`:
+
+1. Generate a revision against a database that is at `head`:
+   `alembic revision --autogenerate -m "add owner team to services"`
+2. Review the file in `alembic/versions/`. Autogenerate is a draft: check types, server defaults for new `NOT NULL` columns on existing rows, constraint names and data migrations. Don't import application code (models, custom types) in a migration; spell types out so the revision keeps working as the models change.
+3. Format it: `ruff format alembic/versions`
+4. Apply it with `alembic upgrade head`, check `alembic downgrade -1` works, and run the tests against PostgreSQL (`TEST_DATABASE_URL`).
+
+**Deployments run migrations before starting the API**, e.g. as a release step or init container:
+
+```bash
+alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+Run the migration once per deployment (not in every replica at the same time), and make schema changes backwards compatible with the version still running during a rolling deploy.
 
 ## Configuration
 
@@ -50,7 +94,7 @@ Settings come from environment variables. For local development, copy `.env.exam
 | ---------------------- | -------- | ------- | --------------------------------------------------------------------------------------------------------------- |
 | `DATABASE_URL`         | Yes      | —       | SQLAlchemy URL, e.g. `postgresql+psycopg://cloudops:<password>@localhost:5432/cloudops`                          |
 | `DATABASE_ECHO`        | No       | `false` | Log every SQL statement                                                                                         |
-| `DATABASE_AUTO_CREATE` | No       | `true`  | Create missing tables on startup. Existing tables are never altered: if one is missing columns or indexes (e.g. an older `telemetry_records` without `fingerprint`), the API refuses to start and names the problem; drop and recreate that table until migrations exist |
+| `DATABASE_AUTO_CREATE` | No       | `false` | Create missing tables directly from the models on startup, bypassing Alembic. For SQLite and throwaway databases only; never for a PostgreSQL database you will migrate later (tables created this way need `alembic stamp 0001`). Independently of this, the API always checks the schema at startup and refuses to start if tables are missing columns or indexes |
 | `DATABASE_CONNECT_TIMEOUT` | No  | `5`     | Seconds to wait for a database connection before failing the request with a retryable 503                        |
 | `OTLP_MAX_BODY_BYTES`  | No       | `10485760` | Largest accepted OTLP request body in bytes (10 MiB), checked before and after gzip decompression |
 | `TEST_DATABASE_URL`    | No       | —       | Database for the test suite (see below)                                                                         |
@@ -265,6 +309,8 @@ app/
   errors.py        Error responses: OTLP google.rpc.Status bodies, retryable 503 when the database is down
   telemetry/       OTLP/HTTP ingestion: decoding (otlp.py), wire schemas (schemas.py),
                    normalisation (normalize.py), table (models.py), queries (repository.py), routes (router.py)
+alembic/           Migration environment (env.py) and revisions (versions/)
+alembic.ini        Alembic configuration (no credentials; the URL comes from DATABASE_URL)
 tests/
   fixtures/otlp/   Representative OTLP/JSON payloads for traces, metrics and logs
 ```
@@ -285,3 +331,5 @@ TEST_DATABASE_URL=postgresql+psycopg://cloudops:<password>@localhost:5432/cloudo
 # Windows (PowerShell)
 $env:TEST_DATABASE_URL = "postgresql+psycopg://cloudops:<password>@localhost:5432/cloudops_test"; pytest
 ```
+
+The migration tests (`tests/test_migrations.py`) run only against PostgreSQL. They create and drop their own temporary databases on the `TEST_DATABASE_URL` server, so that user needs the `CREATEDB` privilege (the CI service user has it). With SQLite they are skipped.

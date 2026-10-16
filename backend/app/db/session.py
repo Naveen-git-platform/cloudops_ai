@@ -1,12 +1,16 @@
+import logging
 from collections.abc import Iterator
 from typing import Any
 
 from sqlalchemy import Engine, create_engine, event, inspect, make_url
 from sqlalchemy.engine.interfaces import DBAPIConnection
+from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import ConnectionPoolEntry
 
 from app.db.base import Base
+
+logger = logging.getLogger(__name__)
 
 
 class Database:
@@ -25,19 +29,44 @@ class Database:
         self._sessionmaker = sessionmaker(self.engine, expire_on_commit=False)
 
     def create_tables(self) -> None:
-        """Create missing tables, then fail if an existing table doesn't match the models.
+        """Create missing tables directly from the models (SQLite and throwaway databases only).
 
-        `create_all` skips tables that already exist, so an older table (for example
-        `telemetry_records` without `fingerprint`) would otherwise be kept and break
-        writes at request time. Until migrations exist, refuse to start instead.
+        PostgreSQL schemas are managed by Alembic (`alembic upgrade head`); tables
+        created this way have no migration history and need `alembic stamp head`.
         """
+        if self.engine.dialect.name == "postgresql":
+            logger.warning(
+                "DATABASE_AUTO_CREATE is creating PostgreSQL tables outside Alembic; "
+                "use `alembic upgrade head` instead (or `alembic stamp head` afterwards)"
+            )
         Base.metadata.create_all(self.engine)
-        problems = schema_problems(self.engine)
+
+    def verify_schema(self) -> None:
+        """Refuse to start if existing tables don't match the models.
+
+        Catches a database that hasn't been migrated (or an old table that
+        `create_all` skipped) before it breaks writes at request time. If the
+        database can't be reached, startup continues: requests then get 503s
+        until it's back, which is the intended outage behaviour.
+        """
+        try:
+            problems = schema_problems(self.engine)
+            unversioned = self.engine.dialect.name == "postgresql" and not inspect(self.engine).has_table(
+                "alembic_version"
+            )
+        except (OperationalError, InterfaceError) as error:
+            logger.warning("Database unreachable at startup; schema not verified: %s", error)
+            return
         if problems:
             raise SchemaMismatchError(
                 "Database schema doesn't match the application: "
                 + "; ".join(problems)
-                + ". Drop and recreate the affected tables (migrations aren't available yet)."
+                + ". Run `alembic upgrade head` from the backend directory."
+            )
+        if unversioned:
+            logger.warning(
+                "PostgreSQL schema matches the models but has no Alembic version; "
+                "run `alembic stamp head` once so future migrations apply"
             )
 
     def session(self) -> Iterator[Session]:
