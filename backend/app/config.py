@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 SERVICE_NAME = "cloudops-api"
@@ -17,6 +18,11 @@ class Settings(BaseSettings):
     database_echo: bool = False
     # Create missing tables on startup. Will be replaced by migrations.
     database_auto_create: bool = True
+    # Seconds to wait when opening a database connection. Without a limit, an
+    # unreachable database makes requests hang until the OS gives up (minutes).
+    database_connect_timeout: int = Field(default=5, gt=0)
+    # Largest accepted OTLP request body, in bytes, both as sent and after decompression.
+    otlp_max_body_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
 
 
 @lru_cache

@@ -1,0 +1,195 @@
+{
+  "resourceMetrics": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "checkout-api"
+            }
+          },
+          {
+            "key": "service.namespace",
+            "value": {
+              "stringValue": "shop"
+            }
+          },
+          {
+            "key": "service.version",
+            "value": {
+              "stringValue": "3.8.1"
+            }
+          },
+          {
+            "key": "deployment.environment.name",
+            "value": {
+              "stringValue": "production"
+            }
+          },
+          {
+            "key": "host.name",
+            "value": {
+              "stringValue": "ip-10-0-1-12"
+            }
+          },
+          {
+            "key": "cloud.provider",
+            "value": {
+              "stringValue": "aws"
+            }
+          },
+          {
+            "key": "cloud.region",
+            "value": {
+              "stringValue": "us-east-1"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "python"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "1.45.0"
+            }
+          }
+        ]
+      },
+      "scopeMetrics": [
+        {
+          "scope": {
+            "name": "opentelemetry.instrumentation.fastapi",
+            "version": "0.56b0"
+          },
+          "metrics": [
+            {
+              "name": "http.server.request.duration",
+              "description": "Duration of HTTP server requests.",
+              "unit": "s",
+              "histogram": {
+                "aggregationTemporality": 2,
+                "dataPoints": [
+                  {
+                    "startTimeUnixNano": "1792065540000000000",
+                    "timeUnixNano": "1792065600000000000",
+                    "count": "42",
+                    "sum": 18.375,
+                    "min": 0.012,
+                    "max": 1.24,
+                    "bucketCounts": [
+                      "10",
+                      "18",
+                      "9",
+                      "4",
+                      "1"
+                    ],
+                    "explicitBounds": [
+                      0.05,
+                      0.1,
+                      0.5,
+                      1.0
+                    ],
+                    "attributes": [
+                      {
+                        "key": "http.request.method",
+                        "value": {
+                          "stringValue": "POST"
+                        }
+                      },
+                      {
+                        "key": "http.route",
+                        "value": {
+                          "stringValue": "/api/checkout"
+                        }
+                      },
+                      {
+                        "key": "http.response.status_code",
+                        "value": {
+                          "intValue": "200"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "http.server.active_requests",
+              "description": "Number of active HTTP server requests.",
+              "unit": "{request}",
+              "sum": {
+                "aggregationTemporality": 2,
+                "isMonotonic": false,
+                "dataPoints": [
+                  {
+                    "startTimeUnixNano": "1792065540000000000",
+                    "timeUnixNano": "1792065600000000000",
+                    "asInt": "12",
+                    "attributes": [
+                      {
+                        "key": "http.request.method",
+                        "value": {
+                          "stringValue": "POST"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "scope": {
+            "name": "opentelemetry.instrumentation.system_metrics",
+            "version": "0.56b0"
+          },
+          "metrics": [
+            {
+              "name": "system.cpu.utilization",
+              "unit": "1",
+              "gauge": {
+                "dataPoints": [
+                  {
+                    "timeUnixNano": "1792065600000000000",
+                    "asDouble": 0.83,
+                    "attributes": [
+                      {
+                        "key": "cpu.mode",
+                        "value": {
+                          "stringValue": "user"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "timeUnixNano": "1792065630000000000",
+                    "asDouble": 0.91,
+                    "attributes": [
+                      {
+                        "key": "cpu.mode",
+                        "value": {
+                          "stringValue": "user"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
