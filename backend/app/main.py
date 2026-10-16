@@ -23,6 +23,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         if config.database_auto_create:
             database.create_tables()
+        database.verify_schema()
         app.state.settings = config
         app.state.database = database
         try:

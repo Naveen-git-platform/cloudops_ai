@@ -16,8 +16,10 @@ class Settings(BaseSettings):
     database_url: str
     # Log every SQL statement (local debugging only).
     database_echo: bool = False
-    # Create missing tables on startup. Will be replaced by migrations.
-    database_auto_create: bool = True
+    # Create missing tables from the models on startup. Off by default: Alembic
+    # (`alembic upgrade head`) manages the PostgreSQL schema. For SQLite and
+    # throwaway local databases only.
+    database_auto_create: bool = False
     # Seconds to wait when opening a database connection. Without a limit, an
     # unreachable database makes requests hang until the OS gives up (minutes).
     database_connect_timeout: int = Field(default=5, gt=0)

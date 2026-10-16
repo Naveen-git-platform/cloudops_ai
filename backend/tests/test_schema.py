@@ -65,8 +65,9 @@ def test_old_table_without_fingerprint_is_refused(database: Database):
     _replace_table(database, drop_column="fingerprint")
 
     with pytest.raises(SchemaMismatchError) as error:
-        database.create_tables()
+        database.verify_schema()
     message = str(error.value)
+    assert "alembic upgrade head" in message
     assert "telemetry_records is missing column(s) fingerprint" in message
     assert "missing index uq_telemetry_fingerprint" in message
 
@@ -84,6 +85,6 @@ def test_app_does_not_start_on_an_incompatible_table(settings: Settings, databas
 
 def test_app_starts_and_creates_a_fresh_schema(settings: Settings, database: Database):
     TABLE.drop(database.engine)
-    with TestClient(create_app(settings)) as client:
+    with TestClient(create_app(settings.model_copy(update={"database_auto_create": True}))) as client:
         assert client.get("/telemetry/records").json() == []
     assert schema_problems(database.engine) == []
