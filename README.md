@@ -80,4 +80,4 @@ Open an issue before large changes. Prefer focused pull requests with tests, cle
 
 ## License
 
-MIT. See [LICENSE](LICENSE) if present in the repository.
+[MIT](LICENSE).
