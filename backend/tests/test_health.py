@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.main import app
 
@@ -22,3 +23,36 @@ def test_health_returns_expected_payload():
 def test_health_rejects_post():
     response = client.post("/health")
     assert response.status_code == 405
+
+
+def test_readiness_returns_ready_when_database_is_available(client: TestClient):
+    response = client.get("/ready")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "ready",
+        "service": "cloudops-api",
+        "version": "0.1.0",
+        "database": "available",
+    }
+
+
+def test_readiness_returns_safe_503_when_database_is_unavailable(
+    client: TestClient, monkeypatch
+):
+    def fail_connect():
+        raise SQLAlchemyError("postgresql://user:secret@database.invalid/cloudops is offline")
+
+    monkeypatch.setattr(client.app.state.database.engine, "connect", fail_connect)
+
+    response = client.get("/ready")
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "status": "not_ready",
+        "service": "cloudops-api",
+        "version": "0.1.0",
+        "database": "unavailable",
+    }
+    assert "secret" not in response.text
+    assert "database.invalid" not in response.text
