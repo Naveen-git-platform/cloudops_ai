@@ -18,7 +18,7 @@ def health() -> dict[str, str]:
     return {"status": "healthy", "service": SERVICE_NAME, "version": VERSION}
 
 
-@router.get("/ready")
+@router.get("/ready", response_model=None)
 def readiness(request: Request) -> dict[str, str] | JSONResponse:
     """Readiness check: confirm the API can reach its database dependency."""
     database = request.app.state.database
