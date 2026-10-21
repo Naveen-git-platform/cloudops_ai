@@ -22,6 +22,9 @@ from app.models import (
 from app.schemas import IntegrationCreate, ServiceCreate
 from app.services.registry import Registry
 
+# Register telemetry tables in shared Base metadata before SQLite create_all.
+import app.telemetry.models  # noqa: F401, E402
+
 SAMPLE_SERVICES = (
     ServiceCreate(
         id="checkout-api",
