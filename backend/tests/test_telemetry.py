@@ -274,6 +274,7 @@ def test_empty_request_is_accepted(client: TestClient, signal: str):
     assert response.json() == {}
     assert records(client) == []
 
+
 @pytest.mark.parametrize("signal", ["traces", "metrics", "logs"])
 def test_valid_gzip_compressed_empty_request_is_accepted(client: TestClient, signal: str):
     response = client.post(
