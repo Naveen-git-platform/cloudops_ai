@@ -55,7 +55,9 @@ class Database:
                 "alembic_version"
             )
         except (OperationalError, InterfaceError) as error:
-            logger.warning("Database unreachable at startup; schema not verified: %s", error)
+            logger.warning(
+                "Database unreachable at startup; schema not verified (%s)", type(error).__name__
+            )
             return
         if problems:
             raise SchemaMismatchError(
