@@ -274,6 +274,17 @@ def test_empty_request_is_accepted(client: TestClient, signal: str):
     assert response.json() == {}
     assert records(client) == []
 
+@pytest.mark.parametrize("signal", ["traces", "metrics", "logs"])
+def test_valid_gzip_compressed_empty_request_is_accepted(client: TestClient, signal: str):
+    response = client.post(
+        f"/v1/{signal}",
+        content=gzip.compress(b""),
+        headers={**JSON, "Content-Encoding": "gzip"},
+    )
+    assert response.status_code == 200
+    assert response.json() == {}
+    assert records(client) == []
+
 
 @pytest.mark.parametrize(
     ("headers", "body", "status"),
@@ -287,6 +298,7 @@ def test_empty_request_is_accepted(client: TestClient, signal: str):
         (JSON, b'{"resourceSpans": [{"scopeSpans": [{"spans": [{"x": NaN}]}]}]}', 400),
         (PROTOBUF, b"\xff\xff\xff\xff", 400),
         ({**PROTOBUF, "Content-Encoding": "gzip"}, b"not gzip", 400),
+        ({**JSON, "Content-Encoding": "gzip"}, b"", 400),
     ],
 )
 def test_invalid_requests_are_rejected(client: TestClient, headers: dict[str, str], body: bytes, status: int):
