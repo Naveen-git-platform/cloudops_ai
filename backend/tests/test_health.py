@@ -56,3 +56,21 @@ def test_readiness_returns_safe_503_when_database_is_unavailable(
     }
     assert "secret" not in response.text
     assert "database.invalid" not in response.text
+
+
+def test_readiness_log_does_not_include_database_exception_details(
+    client: TestClient, monkeypatch, caplog
+):
+    secret_dsn = "postgresql://test_user:fake_password@db.internal/testdb"
+
+    def fail_connect():
+        raise SQLAlchemyError(secret_dsn)
+
+    monkeypatch.setattr(client.app.state.database.engine, "connect", fail_connect)
+
+    with caplog.at_level("WARNING"):
+        response = client.get("/ready")
+
+    assert response.status_code == 503
+    assert secret_dsn not in caplog.text
+    assert "SQLAlchemyError" in caplog.text
