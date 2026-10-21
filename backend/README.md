@@ -333,3 +333,45 @@ $env:TEST_DATABASE_URL = "postgresql+psycopg://cloudops:<password>@localhost:543
 ```
 
 The migration tests (`tests/test_migrations.py`) run only against PostgreSQL. They create and drop their own temporary databases on the `TEST_DATABASE_URL` server, so that user needs the `CREATEDB` privilege (the CI service user has it). With SQLite they are skipped.
+
+
+## Run the ShopStack demo prototype
+
+The repository includes a fictional **ShopStack Demo** workload so you can exercise the dashboard without connecting a real cloud account. It seeds four registered services and five integration metadata records into a local SQLite database. The dashboard's incident, deployment, activity, and chart panels remain explicitly marked demo data; seeded integrations are metadata only and do not connect to Stripe, AWS, Redis, Kubernetes, or PostgreSQL.
+
+From the repository root, open a terminal:
+
+**1. Start the backend and seed a local database (Windows PowerShell):**
+
+```powershell
+cd backend
+python -m venv .venv
+.venv\\Scripts\\Activate.ps1
+python -m pip install -r requirements.txt
+$env:DATABASE_URL = "sqlite:///./cloudops_demo.db"
+python -m scripts.seed_demo
+uvicorn app.main:app --reload
+```
+
+On macOS/Linux, activate the virtual environment with `source .venv/bin/activate` instead. Keep this terminal open. The seed command is safe to run more than once: it inserts missing sample records and does not delete or overwrite existing records.
+
+**2. Start the frontend in a second terminal:**
+
+```powershell
+cd frontend
+npm ci
+Copy-Item .env.example .env.local
+npm run dev
+```
+
+Ensure `.env.local` contains `CLOUDOPS_API_URL=http://127.0.0.1:8000`, then open the local URL printed by Next.js (normally http://localhost:3000). The API docs are at http://127.0.0.1:8000/docs.
+
+**3. Try the sample workload:**
+
+- The Services panel should show ShopStack Checkout API, ShopStack Search, ShopStack Order Worker, and ShopStack Edge Gateway.
+- Checkout and search are intentionally marked degraded to demonstrate a mixed-health project.
+- The existing demo incident list includes checkout 5xx errors and search latency; open an incident to inspect the details and use Resolve to test the local UI interaction.
+- Try the dashboard search to filter services/incidents.
+- Inspect `GET /services` and `GET /integrations` in the API docs to see persisted sample records.
+
+This is a local prototype, not a live cloud monitoring deployment. The sample incidents and telemetry are illustrative and are not generated from actual infrastructure signals. For PostgreSQL, run `alembic upgrade head` first and use a dedicated development database; never run demo seeding against production.
