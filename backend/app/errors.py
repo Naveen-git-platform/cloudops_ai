@@ -36,7 +36,12 @@ def _otlp_error_handler(request: Request, exc: Exception) -> Response:
 
 
 def _database_unavailable_handler(request: Request, exc: Exception) -> Response:
-    logger.warning("Database unavailable while handling %s %s: %s", request.method, request.url.path, exc)
+    logger.warning(
+        "Database unavailable while handling %s %s (%s)",
+        request.method,
+        request.url.path,
+        type(exc).__name__,
+    )
     message = "The database is temporarily unavailable; retry later"
     headers = {"Retry-After": str(RETRY_AFTER_SECONDS)}
     if is_otlp_request(request):
