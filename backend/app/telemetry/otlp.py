@@ -83,6 +83,8 @@ def decompress(body: bytes, content_encoding: str | None, max_bytes: int) -> byt
         return body
     if encoding != "gzip":
         raise OtlpError(415, f"Unsupported Content-Encoding {encoding}; use gzip or none")
+    if not body:
+        raise OtlpError(400, "Request body is not valid gzip")
 
     output = bytearray()
     remaining = body
