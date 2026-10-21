@@ -13,6 +13,8 @@ def test_shopstack_demo_seed_is_repeatable_and_creates_sample_workload(tmp_path)
 
     database = Database(database_url)
     try:
+        # The seeded SQLite database must satisfy the same startup schema check as the API.
+        database.verify_schema()
         with Session(database.engine) as session:
             services = list(session.scalars(select(ServiceRecord).order_by(ServiceRecord.id)))
             integrations = list(session.scalars(select(IntegrationRecord).order_by(IntegrationRecord.id)))
