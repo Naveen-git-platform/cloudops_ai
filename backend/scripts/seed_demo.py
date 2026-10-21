@@ -24,28 +24,28 @@ from app.services.registry import Registry
 
 SAMPLE_SERVICES = (
     ServiceCreate(
-        id="shopstack-checkout-api",
+        id="checkout-api",
         name="ShopStack Checkout API",
         description="ShopStack Demo project · checkout and payment orchestration.",
         environment=Environment.PRODUCTION,
         status=ServiceStatus.DEGRADED,
     ),
     ServiceCreate(
-        id="shopstack-search-service",
+        id="search-service",
         name="ShopStack Search",
         description="ShopStack Demo project · product search and indexing.",
         environment=Environment.PRODUCTION,
         status=ServiceStatus.DEGRADED,
     ),
     ServiceCreate(
-        id="shopstack-order-worker",
+        id="order-worker",
         name="ShopStack Order Worker",
         description="ShopStack Demo project · asynchronous order processing.",
         environment=Environment.PRODUCTION,
         status=ServiceStatus.HEALTHY,
     ),
     ServiceCreate(
-        id="shopstack-edge-gateway",
+        id="edge-gateway",
         name="ShopStack Edge Gateway",
         description="ShopStack Demo project · public API ingress and TLS termination.",
         environment=Environment.PRODUCTION,
@@ -55,39 +55,39 @@ SAMPLE_SERVICES = (
 
 SAMPLE_INTEGRATIONS = (
     IntegrationCreate(
-        id="shopstack-checkout-postgresql",
+        id="checkout-postgresql",
         name="Checkout PostgreSQL",
         type=IntegrationType.POSTGRESQL,
         status=IntegrationStatus.DEGRADED,
-        service_id="shopstack-checkout-api",
+        service_id="checkout-api",
     ),
     IntegrationCreate(
-        id="shopstack-checkout-stripe",
+        id="checkout-stripe",
         name="Stripe Payments (demo metadata)",
         type=IntegrationType.STRIPE,
         status=IntegrationStatus.CONNECTED,
-        service_id="shopstack-checkout-api",
+        service_id="checkout-api",
     ),
     IntegrationCreate(
-        id="shopstack-search-aws",
+        id="search-aws",
         name="Search AWS Runtime (demo metadata)",
         type=IntegrationType.AWS,
         status=IntegrationStatus.CONNECTED,
-        service_id="shopstack-search-service",
+        service_id="search-service",
     ),
     IntegrationCreate(
-        id="shopstack-orders-redis",
+        id="orders-redis",
         name="Order Queue Redis",
         type=IntegrationType.REDIS,
         status=IntegrationStatus.CONNECTED,
-        service_id="shopstack-order-worker",
+        service_id="order-worker",
     ),
     IntegrationCreate(
-        id="shopstack-edge-kubernetes",
+        id="edge-kubernetes",
         name="Edge Kubernetes Runtime (demo metadata)",
         type=IntegrationType.KUBERNETES,
         status=IntegrationStatus.CONNECTED,
-        service_id="shopstack-edge-gateway",
+        service_id="edge-gateway",
     ),
 )
 
