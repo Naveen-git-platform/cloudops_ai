@@ -14,6 +14,7 @@ class Settings(BaseSettings):
 
     # SQLAlchemy URL, e.g. postgresql+psycopg://USER:PASSWORD@HOST:5432/DBNAME
     database_url: str
+    supabase_url: str | None = None
     # Log every SQL statement (local debugging only).
     database_echo: bool = False
     # Create missing tables from the models on startup. Off by default: Alembic
