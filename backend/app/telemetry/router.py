@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response,
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
+from app.auth import require_authenticated_user
 from app.config import Settings
 from app.dependencies import get_session
 from app.telemetry.normalize import NORMALIZERS
@@ -134,7 +135,7 @@ def _as_utc(value: datetime | None) -> datetime | None:
     return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
 
-@router.get("/telemetry/records", response_model=list[TelemetryRecordOut])
+@router.get("/telemetry/records", response_model=list[TelemetryRecordOut], dependencies=[Depends(require_authenticated_user)])
 def list_telemetry_records(
     repository: RepositoryDep,
     service: Annotated[str | None, Query(description="Exact service.name")] = None,
