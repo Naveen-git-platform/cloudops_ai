@@ -45,6 +45,7 @@ def require_authenticated_user(
     subject = claims.get("sub")
     if not isinstance(subject, str) or not subject.strip():
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid access token", headers={"WWW-Authenticate": "Bearer"})
+    request.state.user_id = subject
     return claims
 
 
