@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Index, MetaData, Table, insert, inspect
 from sqlalchemy.exc import IntegrityError
 
+from app.auth import require_authenticated_user
 from app.config import Settings
 from app.db import Database
 from app.db.session import SchemaMismatchError, schema_problems
@@ -85,6 +86,8 @@ def test_app_does_not_start_on_an_incompatible_table(settings: Settings, databas
 
 def test_app_starts_and_creates_a_fresh_schema(settings: Settings, database: Database):
     TABLE.drop(database.engine)
-    with TestClient(create_app(settings.model_copy(update={"database_auto_create": True}))) as client:
+    app = create_app(settings.model_copy(update={"database_auto_create": True}))
+    app.dependency_overrides[require_authenticated_user] = lambda: {"sub": "test-user"}
+    with TestClient(app) as client:
         assert client.get("/telemetry/records").json() == []
     assert schema_problems(database.engine) == []
