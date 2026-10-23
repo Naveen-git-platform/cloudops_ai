@@ -1,10 +1,11 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 
+from app.auth import require_authenticated_user
 from app.dependencies import RegistryDep
 from app.models import Service
 from app.schemas import ServiceCreate
 
-router = APIRouter(prefix="/services", tags=["services"])
+router = APIRouter(prefix="/services", tags=["services"], dependencies=[Depends(require_authenticated_user)])
 
 
 @router.get("", response_model=list[Service])
