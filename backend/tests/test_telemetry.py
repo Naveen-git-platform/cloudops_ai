@@ -433,10 +433,12 @@ def test_telemetry_survives_app_restart(settings: Settings, database: Database):
     first_app = create_app(settings)
     first_app.dependency_overrides[require_authenticated_user] = lambda: {"sub": "test-user"}
     with TestClient(first_app) as first:
+        first.headers.update({"X-OTLP-API-Key": "test-otlp-key"})
         post_json(first, "logs", fixture("logs"))
     second_app = create_app(settings)
     second_app.dependency_overrides[require_authenticated_user] = lambda: {"sub": "test-user"}
     with TestClient(second_app) as second:
+        second.headers.update({"X-OTLP-API-Key": "test-otlp-key"})
         assert len(records(second, signal="logs")) == 3
 
 
