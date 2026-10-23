@@ -97,6 +97,7 @@ Settings come from environment variables. For local development, copy `.env.exam
 | `DATABASE_AUTO_CREATE` | No       | `false` | Create missing tables directly from the models on startup, bypassing Alembic. For SQLite and throwaway databases only; never for a PostgreSQL database you will migrate later (tables created this way need `alembic stamp 0001`). Independently of this, the API always checks the schema at startup and refuses to start if tables are missing columns or indexes |
 | `DATABASE_CONNECT_TIMEOUT` | No  | `5`     | Seconds to wait for a database connection before failing the request with a retryable 503                        |
 | `OTLP_MAX_BODY_BYTES`  | No       | `10485760` | Largest accepted OTLP request body in bytes (10 MiB), checked before and after gzip decompression |
+| `OTLP_INGESTION_API_KEY` | Required for ingestion | — | Shared secret required on every OTLP POST as `X-OTLP-API-Key`; ingestion fails closed with 503 when unset |
 | `TEST_DATABASE_URL`    | No       | —       | Database for the test suite (see below)                                                                         |
 
 ## Run the API
@@ -153,7 +154,7 @@ Integrations store metadata only; no credentials or live connections yet.
 
 ## Telemetry ingestion (OTLP/HTTP)
 
-The API is an OTLP/HTTP receiver. Point any OpenTelemetry SDK or the OpenTelemetry Collector at it:
+The API is an OTLP/HTTP receiver. All ingestion endpoints require a configured shared secret. Set `OTLP_INGESTION_API_KEY` to a long, random secret in the backend environment and configure your collector to send it in `X-OTLP-API-Key`. Requests without a valid key receive 401; if the key is not configured, ingestion fails closed with 503. Do not expose this receiver publicly without a strong secret and HTTPS. Point an OpenTelemetry SDK or Collector at it:
 
 | Method | Path                 | Description                                                    |
 | ------ | -------------------- | -------------------------------------------------------------- |
