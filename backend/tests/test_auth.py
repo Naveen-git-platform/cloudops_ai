@@ -49,3 +49,14 @@ def test_registry_rejects_invalid_token_without_leaking_details(client: TestClie
     assert response.status_code == 401
     assert response.json() == {"detail": "Invalid or expired access token"}
     assert "synthetic internal verification detail" not in response.text
+
+
+def test_telemetry_records_rejects_missing_bearer_token(client: TestClient) -> None:
+    client.app.dependency_overrides.clear()
+    client.app.state.settings.supabase_url = "https://example.supabase.co"
+
+    response = client.get("/telemetry/records")
+
+    assert response.status_code == 401
+    assert response.headers["www-authenticate"] == "Bearer"
+    assert response.json() == {"detail": "Not authenticated"}
