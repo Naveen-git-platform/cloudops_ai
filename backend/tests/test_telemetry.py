@@ -14,6 +14,7 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
 from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
+from app.auth import require_authenticated_user
 from app.config import Settings
 from app.db import Base, Database
 from app.main import create_app
@@ -399,9 +400,13 @@ def test_query_rejects_invalid_parameters(client: TestClient, params: dict[str, 
 
 
 def test_telemetry_survives_app_restart(settings: Settings, database: Database):
-    with TestClient(create_app(settings)) as first:
+    first_app = create_app(settings)
+    first_app.dependency_overrides[require_authenticated_user] = lambda: {"sub": "test-user"}
+    with TestClient(first_app) as first:
         post_json(first, "logs", fixture("logs"))
-    with TestClient(create_app(settings)) as second:
+    second_app = create_app(settings)
+    second_app.dependency_overrides[require_authenticated_user] = lambda: {"sub": "test-user"}
+    with TestClient(second_app) as second:
         assert len(records(second, signal="logs")) == 3
 
 
