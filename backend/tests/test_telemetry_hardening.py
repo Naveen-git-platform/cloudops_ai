@@ -720,8 +720,9 @@ def test_concurrent_duplicate_submissions_store_one_copy(client: TestClient, dat
 def unavailable_db(tmp_path: Path) -> Iterator[tuple[TestClient, Path]]:
     """An app whose SQLite database directory doesn't exist yet: every connection fails."""
     db_dir = tmp_path / "not-yet"
-    settings = Settings(database_url=f"sqlite:///{(db_dir / 'db.sqlite3').as_posix()}", database_auto_create=False)
+    settings = Settings(database_url=f"sqlite:///{(db_dir / 'db.sqlite3').as_posix()}", database_auto_create=False, otlp_ingestion_api_key="test-otlp-key")
     with TestClient(create_app(settings), raise_server_exceptions=False) as client:
+        client.headers.update({"X-OTLP-API-Key": "test-otlp-key"})
         yield client, db_dir
 
 
@@ -794,6 +795,7 @@ def test_unexpected_server_error_returns_otlp_status(settings: Settings, databas
 
     monkeypatch.setattr(TelemetryRepository, "add_many", boom)
     with TestClient(create_app(settings), raise_server_exceptions=False) as client:
+        client.headers.update({"X-OTLP-API-Key": "test-otlp-key"})
         response = client.post("/v1/traces", content=to_protobuf("traces", fixture("traces")), headers=PROTOBUF)
     assert response.status_code == 500
     assert error_status(response)[0] == 13  # INTERNAL
@@ -941,6 +943,7 @@ def test_unreachable_postgres_fails_fast_with_503():
         database_url="postgresql+psycopg://user:pw@10.255.255.1:5432/cloudops",
         database_auto_create=False,
         database_connect_timeout=1,
+        otlp_ingestion_api_key="test-otlp-key",
     )
     with TestClient(create_app(settings), raise_server_exceptions=False) as client:
         started = time.perf_counter()
