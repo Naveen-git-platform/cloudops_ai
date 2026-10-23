@@ -54,6 +54,35 @@ def comparable(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return sorted(({k: r[k] for k in COMPARED_COLUMNS} for r in rows), key=lambda r: json.dumps(r, sort_keys=True))
 
 
+@pytest.mark.parametrize("signal", ["traces", "metrics", "logs"])
+def test_otlp_ingestion_rejects_missing_credentials(client: TestClient, signal: str):
+    response = client.post(f"/v1/{signal}", json={}, headers={"Content-Type": "application/json"})
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Invalid or missing OTLP ingestion credentials"}
+
+
+@pytest.mark.parametrize("signal", ["traces", "metrics", "logs"])
+def test_otlp_ingestion_rejects_invalid_credentials(client: TestClient, signal: str):
+    response = client.post(
+        f"/v1/{signal}",
+        json={},
+        headers={"Content-Type": "application/json", "X-OTLP-API-Key": "wrong-key"},
+    )
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Invalid or missing OTLP ingestion credentials"}
+
+
+@pytest.mark.parametrize("signal", ["traces", "metrics", "logs"])
+def test_otlp_ingestion_fails_closed_when_key_is_unconfigured(settings: Settings, database: Database, signal: str):
+    unconfigured = settings.model_copy(update={"otlp_ingestion_api_key": None})
+    with TestClient(create_app(unconfigured)) as client:
+        response = client.post(
+            f"/v1/{signal}", json={}, headers={"Content-Type": "application/json", "X-OTLP-API-Key": "test-otlp-key"}
+        )
+    assert response.status_code == 503
+    assert response.json() == {"detail": "OTLP ingestion authentication is not configured"}
+
+
 # Traces
 
 
@@ -316,6 +345,7 @@ def test_invalid_requests_are_rejected(client: TestClient, headers: dict[str, st
 def test_oversized_requests_are_rejected(settings: Settings, database: Database):
     small = settings.model_copy(update={"otlp_max_body_bytes": 512})
     with TestClient(create_app(small)) as client:
+        client.headers.update({"X-OTLP-API-Key": "test-otlp-key"})
         big = json.dumps(fixture("traces")).encode()
         assert client.post("/v1/traces", content=big, headers=JSON).status_code == 413
         # A small gzip body that inflates past the limit is refused too.
