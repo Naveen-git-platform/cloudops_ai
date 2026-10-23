@@ -947,7 +947,11 @@ def test_unreachable_postgres_fails_fast_with_503():
     )
     with TestClient(create_app(settings), raise_server_exceptions=False) as client:
         started = time.perf_counter()
-        response = client.post("/v1/traces", content=to_protobuf("traces", fixture("traces")), headers=PROTOBUF)
+        response = client.post(
+            "/v1/traces",
+            content=to_protobuf("traces", fixture("traces")),
+            headers={**PROTOBUF, "X-OTLP-API-Key": "test-otlp-key"},
+        )
         elapsed = time.perf_counter() - started
     assert response.status_code == 503
     assert error_status(response)[0] == 14
