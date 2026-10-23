@@ -71,6 +71,9 @@ export function Header({ query, onQueryChange, incidents, onSelectIncident, onOp
             <span className="block text-xs text-muted">SRE · on-call</span>
           </span>
         </div>
+        <form action="/auth/signout" method="post">
+          <button type="submit" className="rounded-lg border border-line px-3 py-2 text-xs text-muted hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Sign out</button>
+        </form>
       </div>
     </header>
   );
