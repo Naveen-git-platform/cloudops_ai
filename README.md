@@ -32,6 +32,10 @@ curl -i http://127.0.0.1:8000/health
 curl -i http://127.0.0.1:8000/ready
 ```
 
+## Project history
+
+See the [day-by-day development log](docs/DEVELOPMENT_LOG.md) for implemented milestones, major changes, CI evidence, and remaining limitations.
+
 ## Architecture
 
 - `frontend/` — Next.js, React, TypeScript, Tailwind CSS, Motion, and Lucide icons.
