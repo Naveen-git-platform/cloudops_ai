@@ -56,7 +56,7 @@ def comparable(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 @pytest.mark.parametrize("signal", ["traces", "metrics", "logs"])
 def test_otlp_ingestion_rejects_missing_credentials(client: TestClient, signal: str):
-    response = client.post(f"/v1/{signal}", json={}, headers={"Content-Type": "application/json"})
+    response = client.post(f"/v1/{signal}", json={}, headers={"Content-Type": "application/json", "X-OTLP-API-Key": ""})
     assert response.status_code == 401
     assert response.json() == {"detail": "Invalid or missing OTLP ingestion credentials"}
 
