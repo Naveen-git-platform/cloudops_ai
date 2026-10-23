@@ -6,7 +6,6 @@ import jwt
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWKClient
-from jwt.exceptions import InvalidTokenError
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -22,7 +21,7 @@ def require_authenticated_user(
 ) -> dict[str, Any]:
     """Verify a Supabase JWT and return its claims; fail closed on any error."""
     settings = request.app.state.settings
-    base_url = getattr(settings, "supabase_url", None)
+    base_url = settings.supabase_url
     if not base_url:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Authentication is not configured")
     if credentials is None or credentials.scheme.lower() != "bearer":
@@ -39,7 +38,7 @@ def require_authenticated_user(
             issuer=issuer,
             options={"require": ["exp", "iat", "sub", "iss", "aud"]},
         )
-    except (InvalidTokenError, Exception) as exc:
+    except Exception:
         # Do not leak JWT, provider, network, or key details to the caller.
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired access token", headers={"WWW-Authenticate": "Bearer"}) from None
 
