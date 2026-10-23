@@ -23,6 +23,7 @@ from sqlalchemy import Engine, create_engine, inspect, make_url, text
 from sqlalchemy.exc import IntegrityError
 
 from alembic import command
+from app.auth import require_authenticated_user
 from app.config import Settings
 from app.db import Base, Database
 from app.main import create_app
@@ -224,7 +225,12 @@ def test_application_works_on_a_migrated_database(make_database, caplog: pytest.
     url = make_database()
     command.upgrade(alembic_config(url), "head")
 
-    with TestClient(create_app(Settings(database_url=url))) as client:
+    app = create_app(Settings(database_url=url))
+    # This integration test exercises database migrations, not JWT verification.
+    # Keep production authentication enabled and inject a test-only identity.
+    app.dependency_overrides[require_authenticated_user] = lambda: {"sub": "migration-test-user"}
+
+    with TestClient(app) as client:
         assert (
             client.post("/services", json={"name": "Payment Service", "environment": "production"}).status_code == 201
         )
