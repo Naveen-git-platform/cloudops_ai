@@ -8,6 +8,7 @@ from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.auth import require_authenticated_user
 from app.config import Settings
 from app.db import Database, IntegrationRecord, ServiceRecord
 from app.main import create_app
@@ -17,13 +18,19 @@ from app.services.registry import Registry
 
 
 def test_data_survives_app_restart(settings: Settings, database: Database):
-    with TestClient(create_app(settings)) as first:
+    def test_app():
+        app = create_app(settings)
+        # Persistence is under test here; auth is explicitly stubbed for this test only.
+        app.dependency_overrides[require_authenticated_user] = lambda: {"sub": "persistence-test-user"}
+        return app
+
+    with TestClient(test_app()) as first:
         service = first.post("/services", json={"name": "Payment Service", "environment": "production"}).json()
         integration = first.post(
             "/integrations", json={"name": "Stripe", "type": "stripe", "service_id": service["id"]}
         ).json()
 
-    with TestClient(create_app(settings)) as second:
+    with TestClient(test_app()) as second:
         assert second.get(f"/services/{service['id']}").json() == service
         assert second.get(f"/integrations/{integration['id']}").json() == integration
         assert second.get("/services").json() == [service]
