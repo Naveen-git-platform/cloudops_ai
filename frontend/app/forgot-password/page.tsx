@@ -11,7 +11,7 @@ export default function ForgotPasswordPage() {
     event.preventDefault(); setBusy(true); setMessage("");
     try {
       const client = createSupabaseBrowserClient();
-      const result = await client.auth.resetPasswordForEmail(email.trim(), { redirectTo: window.location.origin + "/login" });
+      const result = await client.auth.resetPasswordForEmail(email.trim(), { redirectTo: window.location.origin + "/reset-password" });
       setMessage(result.error ? "Unable to send a recovery email. Try again later." : "If an account exists for this email, a recovery link has been sent.");
     } catch { setMessage("Authentication is not configured. Contact your administrator."); }
     finally { setBusy(false); }
