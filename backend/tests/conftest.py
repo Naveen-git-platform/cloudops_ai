@@ -23,7 +23,7 @@ def database_url(tmp_path_factory: pytest.TempPathFactory) -> str:
 
 @pytest.fixture
 def settings(database_url: str) -> Settings:
-    return Settings(database_url=database_url)
+    return Settings(database_url=database_url, otlp_ingestion_api_key="test-otlp-key")
 
 
 @pytest.fixture
@@ -42,6 +42,7 @@ def client(settings: Settings, database: Database) -> Iterator[TestClient]:
     app = create_app(settings)
     app.dependency_overrides[require_authenticated_user] = lambda: {"sub": "test-user"}
     with TestClient(app) as test_client:
+        test_client.headers.update({"X-OTLP-API-Key": "test-otlp-key"})
         yield test_client
 
 
