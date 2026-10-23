@@ -1,13 +1,4 @@
-"""Test fixtures.
-
-Tests run against PostgreSQL when TEST_DATABASE_URL is set, for example:
-
-    TEST_DATABASE_URL=postgresql+psycopg://cloudops:cloudops@localhost:5432/cloudops_test
-
-Otherwise they fall back to a temporary SQLite file so the suite runs anywhere.
-The test database is wiped before every test, so never point it at real data.
-"""
-
+"""Test fixtures for isolated backend tests."""
 import os
 from collections.abc import Iterator
 from pathlib import Path
@@ -15,6 +6,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from app.auth import require_authenticated_user
 from app.config import Settings
 from app.db import Base, Database
 from app.main import create_app
@@ -46,8 +38,10 @@ def database(settings: Settings) -> Iterator[Database]:
 
 @pytest.fixture
 def client(settings: Settings, database: Database) -> Iterator[TestClient]:
-    """A client for an app connected to the (empty) test database."""
-    with TestClient(create_app(settings)) as test_client:
+    """Test client with auth overridden for existing registry behavior tests."""
+    app = create_app(settings)
+    app.dependency_overrides[require_authenticated_user] = lambda: {"sub": "test-user"}
+    with TestClient(app) as test_client:
         yield test_client
 
 
