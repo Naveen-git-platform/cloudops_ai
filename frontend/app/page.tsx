@@ -1,10 +1,10 @@
 import { DashboardShell } from "@/components/layout/dashboard-shell";
-import { loadServiceRegistry } from "@/lib/api";
+import { getTelemetryRecords, loadServiceRegistry } from "@/lib/api";
 import { demoDashboard } from "@/lib/demo-data";
 
 export default function Home() {
-  // Not awaited: the result streams into the dashboard's Suspense boundaries,
-  // so the rest of the page renders immediately with loading placeholders.
+  // These promises stream independently so live API panels do not block the page.
   const registry = loadServiceRegistry();
-  return <DashboardShell demo={demoDashboard} registry={registry} />;
+  const telemetry = getTelemetryRecords();
+  return <DashboardShell demo={demoDashboard} registry={registry} telemetry={telemetry} />;
 }

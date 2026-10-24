@@ -1,142 +1,94 @@
 "use client";
 
-import { motion } from "motion/react";
-import { useState } from "react";
+import { use } from "react";
 import { Panel } from "@/components/ui/panel";
 import { formatClock } from "@/lib/format";
-import type { TelemetryPoint } from "@/types";
+import type { TelemetryRecord, TelemetryResult } from "@/types";
 
-const W = 600;
-const H = 180;
-const PAD = { top: 12, right: 8, bottom: 22, left: 8 };
+type Signal = "traces" | "metrics" | "logs";
 
-/** Lightweight SVG chart: request rate (area) with error rate (line) on its own scale. */
-export function SystemHealthChart({ points }: { points: TelemetryPoint[] }) {
-  const [hover, setHover] = useState<number | null>(null);
+function summarize(records: TelemetryRecord[]) {
+  const now = Date.now();
+  const buckets = Array.from({ length: 24 }, (_, index) => ({
+    hour: new Date(now - (23 - index) * 60 * 60 * 1000),
+    traces: 0,
+    metrics: 0,
+    logs: 0,
+  }));
+  const start = now - 24 * 60 * 60 * 1000;
+  for (const record of records) {
+    const timestamp = new Date(record.timestamp).getTime();
+    if (!Number.isFinite(timestamp) || timestamp < start || timestamp > now) continue;
+    const index = Math.min(23, Math.floor((timestamp - start) / (60 * 60 * 1000)));
+    buckets[index][record.signal as Signal] += 1;
+  }
+  return buckets;
+}
 
-  const innerW = W - PAD.left - PAD.right;
-  const innerH = H - PAD.top - PAD.bottom;
-  const maxRate = Math.max(...points.map((p) => p.requestRate)) * 1.1;
-  const maxErr = Math.max(5, ...points.map((p) => p.errorRate));
-  const x = (i: number) => PAD.left + (i / (points.length - 1)) * innerW;
-  const yRate = (v: number) => PAD.top + innerH - (v / maxRate) * innerH;
-  const yErr = (v: number) => PAD.top + innerH - (v / maxErr) * innerH;
-
-  const ratePath = points.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${yRate(p.requestRate).toFixed(1)}`).join(" ");
-  const areaPath = `${ratePath} L${x(points.length - 1)},${PAD.top + innerH} L${x(0)},${PAD.top + innerH} Z`;
-  const errPath = points.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${yErr(p.errorRate).toFixed(1)}`).join(" ");
-
-  const latest = points[points.length - 1];
-  const shown = hover !== null ? points[hover] : latest;
-  const ticks = [0, Math.floor(points.length / 2), points.length - 1];
-
-  const onMove = (e: React.PointerEvent<SVGSVGElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const rel = ((e.clientX - rect.left) / rect.width) * W;
-    const i = Math.round(((rel - PAD.left) / innerW) * (points.length - 1));
-    setHover(Math.min(points.length - 1, Math.max(0, i)));
-  };
+function TelemetryChart({ records, truncated }: { records: TelemetryRecord[]; truncated: boolean }) {
+  const buckets = summarize(records);
+  const max = Math.max(1, ...buckets.map((bucket) => bucket.traces + bucket.metrics + bucket.logs));
+  const total = records.length;
+  const latest = records.reduce<TelemetryRecord | null>(
+    (current, record) => !current || new Date(record.timestamp).getTime() > new Date(current.timestamp).getTime() ? record : current,
+    null,
+  );
 
   return (
     <Panel
       id="telemetry"
-      demo
-      title="System health"
-      description="Request rate and error rate across production, last 24h"
+      title="Telemetry activity"
+      description="Stored OpenTelemetry records received in the last 24 hours"
       className="scroll-mt-20 lg:col-span-2"
-      action={
-        <dl className="flex gap-4 text-right text-xs" aria-live="polite">
-          <div>
-            <dt className="flex items-center justify-end gap-1.5 text-muted">
-              <span aria-hidden="true" className="h-0.5 w-3 rounded bg-accent" /> Requests
-            </dt>
-            <dd className="font-mono text-sm text-fg tabular-nums">{shown.requestRate.toLocaleString("en-US")} rps</dd>
-          </div>
-          <div>
-            <dt className="flex items-center justify-end gap-1.5 text-muted">
-              <span aria-hidden="true" className="h-0.5 w-3 rounded border-t border-dashed border-crit" /> Errors
-            </dt>
-            <dd className="font-mono text-sm text-crit tabular-nums">{shown.errorRate.toFixed(2)}%</dd>
-          </div>
-        </dl>
-      }
+      action={<div className="text-right"><div className="font-mono text-lg tabular-nums">{total.toLocaleString("en-US")}</div><div className="text-[10px] text-muted">records queried</div></div>}
     >
-      <svg
-        viewBox={`0 0 ${W} ${H}`}
-        className="h-auto w-full touch-none select-none"
-        role="img"
-        aria-label={`Request rate is ${latest.requestRate} requests per second. Error rate rose to ${latest.errorRate}% in the last 2 hours.`}
-        onPointerMove={onMove}
-        onPointerLeave={() => setHover(null)}
-      >
-        <defs>
-          <linearGradient id="rate-fill" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="var(--color-accent)" stopOpacity="0.22" />
-            <stop offset="100%" stopColor="var(--color-accent)" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-
-        {[0.25, 0.5, 0.75, 1].map((f) => (
-          <line
-            key={f}
-            x1={PAD.left}
-            x2={W - PAD.right}
-            y1={PAD.top + innerH * (1 - f)}
-            y2={PAD.top + innerH * (1 - f)}
-            stroke="var(--color-line)"
-          />
-        ))}
-
-        <motion.path
-          d={areaPath}
-          fill="url(#rate-fill)"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.3 }}
-        />
-        <motion.path
-          d={ratePath}
-          fill="none"
-          stroke="var(--color-accent)"
-          strokeWidth={1.75}
-          strokeLinejoin="round"
-          initial={{ pathLength: 0 }}
-          animate={{ pathLength: 1 }}
-          transition={{ duration: 1, ease: "easeOut" }}
-        />
-        <motion.path
-          d={errPath}
-          fill="none"
-          stroke="var(--color-crit)"
-          strokeWidth={1.5}
-          strokeDasharray="4 3"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.9 }}
-          transition={{ duration: 0.6, delay: 0.6 }}
-        />
-
-        {hover !== null && (
-          <g pointerEvents="none">
-            <line x1={x(hover)} x2={x(hover)} y1={PAD.top} y2={PAD.top + innerH} stroke="var(--color-line-strong)" />
-            <circle cx={x(hover)} cy={yRate(points[hover].requestRate)} r={3.5} fill="var(--color-accent)" />
-            <circle cx={x(hover)} cy={yErr(points[hover].errorRate)} r={3} fill="var(--color-crit)" />
-          </g>
-        )}
-
-        {ticks.map((i) => (
-          <text
-            key={i}
-            x={x(i)}
-            y={H - 6}
-            fontSize={10}
-            fill="var(--color-faint)"
-            textAnchor={i === 0 ? "start" : i === points.length - 1 ? "end" : "middle"}
-            fontFamily="var(--font-mono)"
-          >
-            {hover === null ? formatClock(points[i].timestamp) : i === ticks[1] ? formatClock(points[hover].timestamp) : ""}
-          </text>
-        ))}
-      </svg>
+      {truncated && <p className="mb-3 rounded-md border border-line px-3 py-2 text-xs text-muted">Showing the newest 1,000 records. Counts may be capped by the query limit.</p>}
+      {records.length === 0 ? (
+        <div className="flex min-h-36 flex-col items-center justify-center rounded-lg border border-dashed border-line px-4 text-center">
+          <p className="text-sm font-medium text-fg">No telemetry received yet</p>
+          <p className="mt-1 max-w-md text-xs leading-relaxed text-muted">Once an OpenTelemetry Collector exports traces, metrics, or logs to this backend, their stored records will appear here. This chart does not substitute demo values.</p>
+        </div>
+      ) : (
+        <>
+          <div className="flex h-40 items-end gap-1 border-b border-line pb-2" role="img" aria-label={`Hourly telemetry records over the last 24 hours. ${total} records in the query window.`}>
+            {buckets.map((bucket, index) => {
+              const count = bucket.traces + bucket.metrics + bucket.logs;
+              const height = count ? Math.max(3, (count / max) * 100) : 0;
+              return (
+                <div key={bucket.hour.toISOString()} className="group relative flex h-full min-w-0 flex-1 items-end" title={`${formatClock(bucket.hour.toISOString())}: ${count} records`}>
+                  <div className="flex w-full flex-col justify-end overflow-hidden rounded-t-sm" style={{ height: `${height}%` }}>
+                    {bucket.logs > 0 && <div className="w-full bg-crit" style={{ height: `${(bucket.logs / count) * 100}%` }} />}
+                    {bucket.metrics > 0 && <div className="w-full bg-accent" style={{ height: `${(bucket.metrics / count) * 100}%` }} />}
+                    {bucket.traces > 0 && <div className="w-full bg-emerald-500" style={{ height: `${(bucket.traces / count) * 100}%` }} />}
+                  </div>
+                  {index % 6 === 0 && <span className="absolute -bottom-5 left-0 text-[9px] text-faint">{formatClock(bucket.hour.toISOString()).replace(" UTC", "")}</span>}
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted">
+            <span className="inline-flex items-center gap-1.5"><i className="h-2 w-2 rounded-sm bg-emerald-500" />Traces {records.filter((record) => record.signal === "traces").length}</span>
+            <span className="inline-flex items-center gap-1.5"><i className="h-2 w-2 rounded-sm bg-accent" />Metrics {records.filter((record) => record.signal === "metrics").length}</span>
+            <span className="inline-flex items-center gap-1.5"><i className="h-2 w-2 rounded-sm bg-crit" />Logs {records.filter((record) => record.signal === "logs").length}</span>
+          </div>
+          <p className="mt-3 text-[11px] text-faint">{latest ? `Latest record: ${formatClock(latest.timestamp)} · ${latest.service_name} · ${latest.signal}` : "No recent records."}</p>
+        </>
+      )}
     </Panel>
   );
+}
+
+export function SystemHealthChart({ result }: { result: Promise<TelemetryResult> }) {
+  const telemetry = use(result);
+  if (!telemetry.ok) {
+    return (
+      <Panel id="telemetry" title="Telemetry activity" description="Stored OpenTelemetry records · last 24 hours" className="scroll-mt-20 lg:col-span-2">
+        <div className="rounded-lg border border-line px-4 py-5">
+          <p className="text-sm font-medium text-fg">{telemetry.error.title}</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted">{telemetry.error.detail}</p>
+        </div>
+      </Panel>
+    );
+  }
+  return <TelemetryChart records={telemetry.records} truncated={telemetry.truncated} />;
 }

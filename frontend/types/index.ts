@@ -2,18 +2,15 @@
  * Shared domain types.
  *
  * `Service` and `Integration` mirror the FastAPI responses exactly (snake_case
- * included). The remaining types describe demo data for sections whose
- * backend endpoints don't exist yet.
+ * included). Demo types describe panels whose backend endpoints don't exist yet.
  */
 
 export type HealthStatus = "healthy" | "degraded" | "down";
-/** Service status as stored by the backend; `unknown` until health checks exist. */
 export type ServiceStatus = HealthStatus | "unknown";
 export type Severity = "critical" | "warning" | "resolved";
 export type IncidentStatus = "investigating" | "identified" | "monitoring" | "resolved";
 export type Environment = "production" | "staging" | "development";
 
-/** Response from GET /health */
 export interface HealthResponse {
   status: string;
   service: string;
@@ -26,58 +23,35 @@ export interface Incident {
   severity: Severity;
   status: IncidentStatus;
   service: string;
-  /** ISO 8601 timestamp */
   detectedAt: string;
-  /** ISO 8601 timestamp, null while ongoing */
   resolvedAt: string | null;
   description: string;
 }
 
-/** Response item from GET /services */
 export interface Service {
   id: string;
   name: string;
   description: string;
   environment: Environment;
   status: ServiceStatus;
-  /** ISO 8601 timestamp */
   created_at: string;
 }
 
 export type IntegrationType =
-  | "github"
-  | "aws"
-  | "kubernetes"
-  | "stripe"
-  | "postgresql"
-  | "redis"
-  | "opentelemetry"
-  | "other";
-
+  | "github" | "aws" | "kubernetes" | "stripe" | "postgresql" | "redis" | "opentelemetry" | "other";
 export type IntegrationStatus = "pending" | "connected" | "degraded" | "disconnected";
 
-/** Response item from GET /integrations */
 export interface Integration {
   id: string;
   name: string;
   type: IntegrationType;
   status: IntegrationStatus;
   service_id: string;
-  /** ISO 8601 timestamp */
   created_at: string;
 }
 
-/**
- * Result of loading services and integrations from the API. Never rejects, so
- * it can be streamed to client components and rendered as a loading/error state.
- */
 export type ServiceRegistryResult =
-  | {
-      ok: true;
-      services: Service[];
-      /** null when GET /integrations failed but services loaded */
-      integrations: Integration[] | null;
-    }
+  | { ok: true; services: Service[]; integrations: Integration[] | null }
   | { ok: false; error: { title: string; detail: string } };
 
 export interface Deployment {
@@ -86,7 +60,6 @@ export interface Deployment {
   version: string;
   environment: Environment;
   status: "succeeded" | "failed" | "in_progress";
-  /** ISO 8601 timestamp */
   deployedAt: string;
   author: string;
 }
@@ -98,18 +71,43 @@ export interface ActivityEvent {
   kind: ActivityKind;
   title: string;
   detail: string;
-  /** ISO 8601 timestamp */
   timestamp: string;
 }
 
-export interface TelemetryPoint {
-  /** ISO 8601 timestamp */
+/** Response item from GET /telemetry/records. */
+export interface TelemetryRecord {
+  id: number;
+  signal: "traces" | "metrics" | "logs";
+  service_name: string;
+  service_namespace: string | null;
+  service_version: string | null;
+  environment: string | null;
+  host_name: string | null;
+  scope_name: string | null;
+  scope_version: string | null;
   timestamp: string;
-  /** Requests per second */
-  requestRate: number;
-  /** Error rate percentage */
-  errorRate: number;
+  end_timestamp: string | null;
+  received_at: string;
+  name: string | null;
+  trace_id: string | null;
+  span_id: string | null;
+  parent_span_id: string | null;
+  span_kind: string | null;
+  status_code: string | null;
+  severity_number: number | null;
+  severity_text: string | null;
+  body: string | null;
+  metric_type: string | null;
+  unit: string | null;
+  value: number | null;
+  resource_attributes: Record<string, unknown>;
+  attributes: Record<string, unknown>;
+  raw: Record<string, unknown>;
 }
+
+export type TelemetryResult =
+  | { ok: true; records: TelemetryRecord[]; truncated: boolean }
+  | { ok: false; error: { title: string; detail: string } };
 
 /** Demo-only data for sections without backend endpoints yet. */
 export interface DemoDashboardData {
@@ -117,4 +115,11 @@ export interface DemoDashboardData {
   deployments: Deployment[];
   activity: ActivityEvent[];
   telemetry: TelemetryPoint[];
+}
+
+/** Legacy chart points retained for demo-only fixtures; not a live metric contract. */
+export interface TelemetryPoint {
+  timestamp: string;
+  requestRate: number;
+  errorRate: number;
 }
