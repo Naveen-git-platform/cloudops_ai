@@ -225,12 +225,13 @@ def test_application_works_on_a_migrated_database(make_database, caplog: pytest.
     url = make_database()
     command.upgrade(alembic_config(url), "head")
 
-    app = create_app(Settings(database_url=url))
+    app = create_app(Settings(database_url=url, otlp_ingestion_api_key="test-otlp-key"))
     # This integration test exercises database migrations, not JWT verification.
     # Keep production authentication enabled and inject a test-only identity.
     app.dependency_overrides[require_authenticated_user] = lambda: {"sub": "migration-test-user"}
 
     with TestClient(app) as client:
+        client.headers.update({"X-OTLP-API-Key": "test-otlp-key"})
         assert (
             client.post("/services", json={"name": "Payment Service", "environment": "production"}).status_code == 201
         )

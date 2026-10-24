@@ -1,11 +1,12 @@
 """OTLP/HTTP ingestion endpoints and a query endpoint for stored telemetry."""
 
 import logging
+import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
@@ -25,6 +26,26 @@ from app.telemetry.otlp import (
 from app.telemetry.repository import TelemetryQuery, TelemetryRepository
 
 logger = logging.getLogger(__name__)
+
+def require_otlp_ingestion_key(
+    request: Request,
+    supplied_key: Annotated[str | None, Header(alias="X-OTLP-API-Key")] = None,
+) -> None:
+    """Require a configured shared secret for service-to-service OTLP ingestion."""
+    settings: Settings = request.app.state.settings
+    expected_key = settings.otlp_ingestion_api_key
+    if not expected_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="OTLP ingestion authentication is not configured",
+        )
+    if supplied_key is None or not secrets.compare_digest(supplied_key, expected_key):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or missing OTLP ingestion credentials",
+            headers={"WWW-Authenticate": 'ApiKey realm="otlp"'},
+        )
+
 
 router = APIRouter(tags=["telemetry"])
 
@@ -81,17 +102,17 @@ _OTLP_DOC = (
 )
 
 
-@router.post("/v1/traces", summary="Export traces (OTLP/HTTP)", description=_OTLP_DOC)
+@router.post("/v1/traces", dependencies=[Depends(require_otlp_ingestion_key)], summary="Export traces (OTLP/HTTP)", description=_OTLP_DOC)
 def export_traces(body: BodyDep, repository: RepositoryDep) -> Response:
     return _ingest(Signal.TRACES, body, repository)
 
 
-@router.post("/v1/metrics", summary="Export metrics (OTLP/HTTP)", description=_OTLP_DOC)
+@router.post("/v1/metrics", dependencies=[Depends(require_otlp_ingestion_key)], summary="Export metrics (OTLP/HTTP)", description=_OTLP_DOC)
 def export_metrics(body: BodyDep, repository: RepositoryDep) -> Response:
     return _ingest(Signal.METRICS, body, repository)
 
 
-@router.post("/v1/logs", summary="Export logs (OTLP/HTTP)", description=_OTLP_DOC)
+@router.post("/v1/logs", dependencies=[Depends(require_otlp_ingestion_key)], summary="Export logs (OTLP/HTTP)", description=_OTLP_DOC)
 def export_logs(body: BodyDep, repository: RepositoryDep) -> Response:
     return _ingest(Signal.LOGS, body, repository)
 

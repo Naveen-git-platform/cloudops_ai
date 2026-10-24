@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     database_auto_create: bool = False
     database_connect_timeout: int = Field(default=5, gt=0)
     otlp_max_body_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
+    otlp_ingestion_api_key: str | None = None
 
 @lru_cache
 def get_settings() -> Settings:
