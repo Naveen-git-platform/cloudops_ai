@@ -5,8 +5,7 @@ import { Panel } from "@/components/ui/panel";
 import { formatClock } from "@/lib/format";
 import type { TelemetryRecord, TelemetryResult } from "@/types";
 
-const SIGNALS = ["traces", "metrics", "logs"] as const;
-type Signal = (typeof SIGNALS)[number];
+type Signal = "traces" | "metrics" | "logs";
 
 function summarize(records: TelemetryRecord[]) {
   const now = Date.now();
