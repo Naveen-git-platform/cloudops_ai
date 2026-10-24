@@ -6,7 +6,6 @@ import { connection } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Deployment, HealthResponse, Incident, Integration, Service, ServiceRegistryResult, TelemetryRecord, TelemetryResult } from "@/types";
 export const API_BASE_URL = (process.env.CLOUDOPS_API_URL ?? "http://127.0.0.1:8000").replace(/\/+$/, "");
-export const API_BASE_URL = (process.env.CLOUDOPS_API_URL ?? "http://127.0.0.1:8000").replace(/\\/+$/, "");
 const REQUEST_TIMEOUT_MS = 5_000;
 const TELEMETRY_LIMIT = 1000;
 
