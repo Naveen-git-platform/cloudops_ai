@@ -19,9 +19,8 @@ import { ServiceHealthList } from "@/components/services/service-health-list";
 import { DEMO_NOW } from "@/lib/demo-data";
 import { staggerContainer } from "@/lib/motion";
 import { matchesQuery } from "@/lib/search";
-import type { DemoDashboardData, Incident, ServiceRegistryResult } from "@/types";
+import type { DemoDashboardData, Incident, ServiceRegistryResult, TelemetryResult } from "@/types";
 
-/** Overview subtitle with the live service count. */
 function ServiceCount({ registry }: { registry: Promise<ServiceRegistryResult> }) {
   const result = use(registry);
   if (!result.ok) return <>Service data is currently unavailable.</>;
@@ -29,7 +28,6 @@ function ServiceCount({ registry }: { registry: Promise<ServiceRegistryResult> }
   return <>Tracking {n} registered {n === 1 ? "service" : "services"} from the CloudOps API.</>;
 }
 
-/** Banner shown above the summary when the API can't be reached; renders nothing otherwise. */
 function RegistryAlert({ registry }: { registry: Promise<ServiceRegistryResult> }) {
   const result = use(registry);
   return result.ok ? null : <RegistryError {...result.error} compact />;
@@ -37,11 +35,11 @@ function RegistryAlert({ registry }: { registry: Promise<ServiceRegistryResult> 
 
 interface DashboardShellProps {
   demo: DemoDashboardData;
-  /** Streamed from the server; see lib/api.ts loadServiceRegistry(). */
   registry: Promise<ServiceRegistryResult>;
+  telemetry: Promise<TelemetryResult>;
 }
 
-export function DashboardShell({ demo, registry }: DashboardShellProps) {
+export function DashboardShell({ demo, registry, telemetry }: DashboardShellProps) {
   const [incidents, setIncidents] = useState<Incident[]>(demo.incidents);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -55,7 +53,6 @@ export function DashboardShell({ demo, registry }: DashboardShellProps) {
   const closeDetail = useCallback(() => setSelectedId(null), []);
   const closeNav = useCallback(() => setNavOpen(false), []);
 
-  // Demo-only: resolves locally. Will become a PATCH /incidents/{id} call.
   const resolveIncident = (id: string) =>
     setIncidents((prev) =>
       prev.map((i) =>
@@ -65,82 +62,42 @@ export function DashboardShell({ demo, registry }: DashboardShellProps) {
 
   return (
     <MotionConfig reducedMotion="user">
-      <a
-        href="#main"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[60] focus:rounded-lg focus:bg-surface-strong focus:px-3 focus:py-2 focus:text-sm"
-      >
+      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[60] focus:rounded-lg focus:bg-surface-strong focus:px-3 focus:py-2 focus:text-sm">
         Skip to content
       </a>
-
       <div className="flex min-h-screen">
-        {/* Rail on tablet, full sidebar on desktop, hidden on mobile */}
         <aside className="sticky top-0 hidden h-screen w-16 shrink-0 flex-col gap-6 border-r border-line bg-canvas/60 p-3 backdrop-blur md:flex lg:w-60 lg:p-4">
-          <div className="hidden lg:block">
-            <Brand />
-          </div>
-          <div className="flex justify-center lg:hidden">
-            <Brand compact />
-          </div>
+          <div className="hidden lg:block"><Brand /></div>
+          <div className="flex justify-center lg:hidden"><Brand compact /></div>
           <SidebarNav activeId={activeId} compact layoutScope="desktop" />
           <p className="mt-auto hidden rounded-lg border border-line p-3 text-[11px] leading-relaxed text-faint lg:block">
-            Services and integrations are live from the CloudOps API. Incidents, activity, telemetry and deployments are demo data.
+            Services and integrations are live from the CloudOps API. Telemetry is queried from stored backend records; incidents, activity and deployments remain demo data.
           </p>
         </aside>
-
         <MobileNav open={navOpen} activeId={activeId} onClose={closeNav} />
-
         <div className="min-w-0 flex-1">
-          <Header
-            query={query}
-            onQueryChange={setQuery}
-            incidents={incidents}
-            onSelectIncident={setSelectedId}
-            onOpenMenu={() => setNavOpen(true)}
-          />
-
-          <motion.main
-            id="main"
-            initial="hidden"
-            animate="show"
-            variants={staggerContainer}
-            className="mx-auto max-w-[1440px] space-y-4 px-4 py-6 sm:px-6"
-          >
-            <motion.div
-              id="overview"
-              className="scroll-mt-20"
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4 }}
-            >
+          <Header query={query} onQueryChange={setQuery} incidents={incidents} onSelectIncident={setSelectedId} onOpenMenu={() => setNavOpen(true)} />
+          <motion.main id="main" initial="hidden" animate="show" variants={staggerContainer} className="mx-auto max-w-[1440px] space-y-4 px-4 py-6 sm:px-6">
+            <motion.div id="overview" className="scroll-mt-20" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
               <h1 className="text-xl font-semibold tracking-tight">Overview</h1>
-              <p className="mt-1 text-sm text-muted">
-                <Suspense fallback="Loading services from the CloudOps API…">
-                  <ServiceCount registry={registry} />
-                </Suspense>
-              </p>
+              <p className="mt-1 text-sm text-muted"><Suspense fallback="Loading services from the CloudOps API…"><ServiceCount registry={registry} /></Suspense></p>
             </motion.div>
-
-            <Suspense fallback={null}>
-              <RegistryAlert registry={registry} />
-            </Suspense>
-
+            <Suspense fallback={null}><RegistryAlert registry={registry} /></Suspense>
             <SummaryCards registry={registry} activeIncidents={activeIncidents} deployments={demo.deployments.length} />
-
             <div className="grid gap-4 lg:grid-cols-3">
               <IncidentList incidents={filteredIncidents} onOpen={setSelectedId} />
               <ActivityTimeline events={demo.activity} />
             </div>
-
             <div className="grid gap-4 lg:grid-cols-3">
-              <SystemHealthChart points={demo.telemetry} />
+              <Suspense fallback={<div className="min-h-52 animate-pulse rounded-xl border border-line bg-surface p-5 text-xs text-muted">Loading stored telemetry…</div>}>
+                <SystemHealthChart result={telemetry} />
+              </Suspense>
               <DeploymentsList deployments={demo.deployments} />
             </div>
-
             <ServiceHealthList registry={registry} query={query} />
           </motion.main>
         </div>
       </div>
-
       <IncidentDetailPanel incident={selected} onClose={closeDetail} onResolve={resolveIncident} />
     </MotionConfig>
   );
