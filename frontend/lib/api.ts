@@ -4,10 +4,11 @@
  */
 import { connection } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { Deployment, HealthResponse, Incident, Integration, Service, ServiceRegistryResult, TelemetryPoint } from "@/types";
+import type { Deployment, HealthResponse, Incident, Integration, Service, ServiceRegistryResult, TelemetryRecord, TelemetryResult } from "@/types";
 
-export const API_BASE_URL = (process.env.CLOUDOPS_API_URL ?? "http://127.0.0.1:8000").replace(/\/+$/, "");
+export const API_BASE_URL = (process.env.CLOUDOPS_API_URL ?? "http://127.0.0.1:8000").replace(/\\/+$/, "");
 const REQUEST_TIMEOUT_MS = 5_000;
+const TELEMETRY_LIMIT = 1000;
 
 export class ApiError extends Error {
   constructor(public readonly path: string, public readonly status: number | null, message: string) {
@@ -44,7 +45,37 @@ export const getIntegrations = (serviceId?: string) =>
   request<Integration[]>(serviceId ? `/integrations?service_id=${encodeURIComponent(serviceId)}` : "/integrations");
 export const getIncidents = () => request<Incident[]>("/incidents");
 export const getDeployments = () => request<Deployment[]>("/deployments");
-export const getTelemetry = () => request<TelemetryPoint[]>("/telemetry");
+
+/** Fetch stored telemetry from the protected API, bounded to the last 24 hours and 1,000 records. */
+export async function getTelemetryRecords(): Promise<TelemetryResult> {
+  await connection();
+  const end = new Date();
+  const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+  const params = new URLSearchParams({
+    start: start.toISOString(),
+    end: end.toISOString(),
+    limit: String(TELEMETRY_LIMIT),
+  });
+  const path = `/telemetry/records?${params.toString()}`;
+  try {
+    const records = await request<TelemetryRecord[]>(path);
+    return { ok: true, records, truncated: records.length === TELEMETRY_LIMIT };
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) {
+      return { ok: false, error: { title: "Sign in to view telemetry", detail: "Your session is missing or expired. Sign in again to query stored telemetry." } };
+    }
+    if (error instanceof ApiError && error.status === 403) {
+      return { ok: false, error: { title: "Telemetry access denied", detail: "Your account is not authorized to read stored telemetry." } };
+    }
+    if (error instanceof ApiError && error.status === null) {
+      return { ok: false, error: { title: "Can't reach the CloudOps API", detail: `The request to ${API_BASE_URL} ${error.message}. Check that the backend is running and CLOUDOPS_API_URL is correct.` } };
+    }
+    if (error instanceof ApiError) {
+      return { ok: false, error: { title: "Telemetry API returned an error", detail: `GET ${error.path} ${error.message}. Check backend logs for details.` } };
+    }
+    return { ok: false, error: { title: "Unable to read telemetry", detail: "The API response could not be read." } };
+  }
+}
 
 function describeError(error: unknown): ServiceRegistryResult & { ok: false } {
   if (error instanceof ApiError && error.status === null) {
