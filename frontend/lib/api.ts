@@ -14,7 +14,7 @@ export const API_BASE_URL = (
     ? "https://cloudops-ai-api.onrender.com"
     : "http://127.0.0.1:8000")
 ).replace(/\/+$/, "");
-const REQUEST_TIMEOUT_MS = 5_000;
+const REQUEST_TIMEOUT_MS = 30_000;
 const TELEMETRY_LIMIT = 1000;
 
 export class ApiError extends Error {
