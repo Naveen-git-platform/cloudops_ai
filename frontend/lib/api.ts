@@ -5,7 +5,15 @@
 import { connection } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Deployment, HealthResponse, Incident, Integration, Service, ServiceRegistryResult, TelemetryRecord, TelemetryResult } from "@/types";
-export const API_BASE_URL = (process.env.CLOUDOPS_API_URL ?? "http://127.0.0.1:8000").replace(/\/+$/, "");
+
+// Use the deployed API as the safe production fallback. Local development can
+// override this with CLOUDOPS_API_URL=http://127.0.0.1:8000 in its local env.
+export const API_BASE_URL = (
+  process.env.CLOUDOPS_API_URL ??
+  (process.env.NODE_ENV === "production"
+    ? "https://cloudops-ai-api.onrender.com"
+    : "http://127.0.0.1:8000")
+).replace(/\/+$/, "");
 const REQUEST_TIMEOUT_MS = 5_000;
 const TELEMETRY_LIMIT = 1000;
 
