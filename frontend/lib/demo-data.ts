@@ -7,6 +7,9 @@
  */
 import type { DemoDashboardData } from "@/types";
 
+/** Runtime reference time used by relative-time formatters. */
+export const DEMO_NOW = new Date();
+
 export const demoDashboard: DemoDashboardData = {
   incidents: [],
   deployments: [],
