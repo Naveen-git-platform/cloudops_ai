@@ -41,9 +41,7 @@ def _database_unavailable_handler(request: Request, exc: Exception) -> Response:
         request.method,
         request.url.path,
         type(exc).__name__,
-        # Include the driver-level reason in server logs, never in the HTTP response.
-        # This distinguishes authentication, network, timeout and schema failures.
-        extra={"database_error": str(getattr(exc, "orig", exc))[:500]},
+        str(getattr(exc, "orig", exc))[:500],
     )
     message = "The database is temporarily unavailable; retry later"
     headers = {"Retry-After": str(RETRY_AFTER_SECONDS)}
