@@ -41,6 +41,7 @@ def _database_unavailable_handler(request: Request, exc: Exception) -> Response:
         request.method,
         request.url.path,
         type(exc).__name__,
+        str(getattr(exc, "orig", exc))[:500],
     )
     message = "The database is temporarily unavailable; retry later"
     headers = {"Retry-After": str(RETRY_AFTER_SECONDS)}
