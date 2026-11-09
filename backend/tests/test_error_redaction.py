@@ -27,7 +27,10 @@ def _request(path: str = "/services") -> Request:
 
 def test_database_unavailable_handler_redacts_driver_exception(caplog):
     secret_dsn = "postgresql://test_user:fake_password@db.internal/testdb"
-    error = OperationalError("SELECT 1", {}, Exception(secret_dsn))
+    class DriverError(Exception):
+        sqlstate = "28P01"
+
+    error = OperationalError("SELECT 1", {}, DriverError(secret_dsn))
 
     with caplog.at_level(logging.WARNING):
         response = _database_unavailable_handler(_request(), error)
@@ -37,6 +40,8 @@ def test_database_unavailable_handler_redacts_driver_exception(caplog):
     assert secret_dsn not in caplog.text
     assert secret_dsn.encode() not in response.body
     assert "OperationalError" in caplog.text
+    assert "DriverError" in caplog.text
+    assert "sqlstate=28P01" in caplog.text
 
 
 def test_startup_schema_check_redacts_driver_exception(monkeypatch, caplog):
