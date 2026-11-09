@@ -102,6 +102,15 @@ export async function getTelemetryRecords(): Promise<TelemetryResult> {
     if (error instanceof ApiError && error.status === 403) {
       return { ok: false, error: { title: "Telemetry access denied", detail: "Your account is not authorized to read stored telemetry." } };
     }
+    if (error instanceof ApiError && error.status === 503) {
+      return { ok: false, error: { title: "Telemetry storage unavailable", detail: "The API is reachable, but the database cannot currently serve telemetry queries. Check database connectivity and retry." } };
+    }
+    if (error instanceof ApiError && error.status === 429) {
+      return { ok: false, error: { title: "Telemetry query rate limited", detail: "The API is throttling telemetry queries. Wait briefly, then retry." } };
+    }
+    if (error instanceof ApiError && error.status !== null && error.status >= 500) {
+      return { ok: false, error: { title: "Telemetry API server error", detail: `The telemetry query failed with HTTP ${error.status}. Check backend logs and retry after recovery.` } };
+    }
     if (error instanceof ApiError && error.status === null) {
       return { ok: false, error: { title: "Can't reach the CloudOps API", detail: `The request to ${API_BASE_URL} ${error.message}. Check that the backend is running and CLOUDOPS_API_URL is correct.` } };
     }
