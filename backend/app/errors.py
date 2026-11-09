@@ -36,11 +36,17 @@ def _otlp_error_handler(request: Request, exc: Exception) -> Response:
 
 
 def _database_unavailable_handler(request: Request, exc: Exception) -> Response:
+    original = getattr(exc, "orig", None)
+    # SQLSTATE is a stable, non-secret PostgreSQL diagnostic. Never log the
+    # driver's message: it may contain a DSN, hostname, query, or credentials.
+    sqlstate = getattr(original, "sqlstate", None) or getattr(original, "pgcode", None)
     logger.warning(
-        "Database unavailable while handling %s %s (%s)",
+        "Database unavailable while handling %s %s (error=%s driver=%s sqlstate=%s)",
         request.method,
         request.url.path,
         type(exc).__name__,
+        type(original).__name__ if original is not None else "unknown",
+        sqlstate or "unavailable",
     )
     message = "The database is temporarily unavailable; retry later"
     headers = {"Retry-After": str(RETRY_AFTER_SECONDS)}
