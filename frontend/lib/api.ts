@@ -16,6 +16,23 @@ export const API_BASE_URL = (
 ).replace(/\/+$/, "");
 const REQUEST_TIMEOUT_MS = 30_000;
 const TELEMETRY_LIMIT = 1000;
+const MAX_GET_RETRIES = 2;
+const RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
+
+function retryDelay(response: Response | null, retry: number): number {
+  const retryAfter = response?.headers.get("Retry-After");
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    const requested = Number.isFinite(seconds)
+      ? seconds * 1000
+      : Date.parse(retryAfter) - Date.now();
+    if (Number.isFinite(requested) && requested >= 0) return Math.min(requested, 2_000);
+  }
+  return 250 * 2 ** retry;
+}
+
+const wait = (milliseconds: number) =>
+  new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 export class ApiError extends Error {
   constructor(public readonly path: string, public readonly status: number | null, message: string) {
@@ -29,14 +46,25 @@ async function request<T>(path: string): Promise<T> {
   try {
     const supabase = await createSupabaseServerClient();
     const { data: { session } } = await supabase.auth.getSession();
-    res = await fetch(`${API_BASE_URL}${path}`, {
-      headers: {
-        Accept: "application/json",
-        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-      },
-      cache: "no-store",
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    });
+    const headers = {
+      Accept: "application/json",
+      ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+    };
+    for (let retry = 0; ; retry += 1) {
+      try {
+        res = await fetch(`${API_BASE_URL}${path}`, {
+          headers,
+          cache: "no-store",
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        });
+      } catch (cause) {
+        if (retry >= MAX_GET_RETRIES) throw cause;
+        await wait(retryDelay(null, retry));
+        continue;
+      }
+      if (!RETRYABLE_STATUSES.has(res.status) || retry >= MAX_GET_RETRIES) break;
+      await wait(retryDelay(res, retry));
+    }
   } catch (cause) {
     if (cause instanceof ApiError) throw cause;
     const timedOut = cause instanceof DOMException && cause.name === "TimeoutError";
@@ -74,6 +102,15 @@ export async function getTelemetryRecords(): Promise<TelemetryResult> {
     if (error instanceof ApiError && error.status === 403) {
       return { ok: false, error: { title: "Telemetry access denied", detail: "Your account is not authorized to read stored telemetry." } };
     }
+    if (error instanceof ApiError && error.status === 503) {
+      return { ok: false, error: { title: "Telemetry storage unavailable", detail: "The API is reachable, but the database cannot currently serve telemetry queries. Check database connectivity and retry." } };
+    }
+    if (error instanceof ApiError && error.status === 429) {
+      return { ok: false, error: { title: "Telemetry query rate limited", detail: "The API is throttling telemetry queries. Wait briefly, then retry." } };
+    }
+    if (error instanceof ApiError && error.status !== null && error.status >= 500) {
+      return { ok: false, error: { title: "Telemetry API server error", detail: `The telemetry query failed with HTTP ${error.status}. Check backend logs and retry after recovery.` } };
+    }
     if (error instanceof ApiError && error.status === null) {
       return { ok: false, error: { title: "Can't reach the CloudOps API", detail: `The request to ${API_BASE_URL} ${error.message}. Check that the backend is running and CLOUDOPS_API_URL is correct.` } };
     }
@@ -90,6 +127,21 @@ function describeError(error: unknown): ServiceRegistryResult & { ok: false } {
   }
   if (error instanceof ApiError && error.status === 401) {
     return { ok: false, error: { title: "Your session needs refreshing", detail: "Sign in again to continue loading service data." } };
+  }
+  if (error instanceof ApiError && error.status === 403) {
+    return { ok: false, error: { title: "Service access denied", detail: "Your account is not authorized to view the service registry." } };
+  }
+  if (error instanceof ApiError && error.status === 404) {
+    return { ok: false, error: { title: "Service endpoint not found", detail: "The deployed API does not expose this registry endpoint. Check that the frontend and backend versions are compatible." } };
+  }
+  if (error instanceof ApiError && error.status === 429) {
+    return { ok: false, error: { title: "API rate limit reached", detail: "The CloudOps API is throttling requests. Wait briefly, then retry." } };
+  }
+  if (error instanceof ApiError && error.status === 503) {
+    return { ok: false, error: { title: "CloudOps database unavailable", detail: "The API is running but cannot currently serve database-backed service data. Check backend database connectivity, then retry." } };
+  }
+  if (error instanceof ApiError && error.status !== null && error.status >= 500) {
+    return { ok: false, error: { title: "CloudOps API server error", detail: `The service registry request failed with HTTP ${error.status}. Check backend logs for the request and retry after the service recovers.` } };
   }
   if (error instanceof ApiError) {
     return { ok: false, error: { title: "The CloudOps API returned an error", detail: `GET ${error.path} ${error.message}. Check the backend logs for details.` } };

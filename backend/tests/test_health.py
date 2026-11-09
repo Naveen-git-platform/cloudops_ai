@@ -29,12 +29,13 @@ def test_readiness_returns_ready_when_database_is_available(client: TestClient):
     response = client.get("/ready")
 
     assert response.status_code == 200
-    assert response.json() == {
-        "status": "ready",
-        "service": "cloudops-api",
-        "version": "0.1.0",
-        "database": "available",
-    }
+    payload = response.json()
+    assert payload["status"] == "ready"
+    assert payload["service"] == "cloudops-api"
+    assert payload["version"] == "0.1.0"
+    assert payload["database"] == "available"
+    assert isinstance(payload["database_latency_ms"], (int, float))
+    assert payload["database_latency_ms"] >= 0
 
 
 def test_readiness_returns_safe_503_when_database_is_unavailable(
@@ -53,7 +54,9 @@ def test_readiness_returns_safe_503_when_database_is_unavailable(
         "service": "cloudops-api",
         "version": "0.1.0",
         "database": "unavailable",
+        "error_code": "database_unavailable",
     }
+    assert "database_unavailable" in response.text
     assert "secret" not in response.text
     assert "database.invalid" not in response.text
 

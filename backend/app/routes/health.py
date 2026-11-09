@@ -1,4 +1,5 @@
 import logging
+from time import perf_counter
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -22,6 +23,7 @@ def health() -> dict[str, str]:
 def readiness(request: Request) -> dict[str, str] | JSONResponse:
     """Readiness check: confirm the API can reach its database dependency."""
     database = request.app.state.database
+    started_at = perf_counter()
     try:
         with database.engine.connect() as connection:
             connection.execute(text("SELECT 1"))
@@ -35,6 +37,7 @@ def readiness(request: Request) -> dict[str, str] | JSONResponse:
                 "service": SERVICE_NAME,
                 "version": VERSION,
                 "database": "unavailable",
+                "error_code": "database_unavailable",
             },
         )
 
@@ -43,4 +46,5 @@ def readiness(request: Request) -> dict[str, str] | JSONResponse:
         "service": SERVICE_NAME,
         "version": VERSION,
         "database": "available",
+        "database_latency_ms": round((perf_counter() - started_at) * 1000, 2),
     }

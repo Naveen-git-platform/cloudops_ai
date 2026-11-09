@@ -376,3 +376,27 @@ Ensure `.env.local` contains `CLOUDOPS_API_URL=http://127.0.0.1:8000`, then open
 - Inspect `GET /services` and `GET /integrations` in the API docs to see persisted sample records.
 
 This is a local prototype, not a live cloud monitoring deployment. The sample incidents and telemetry are illustrative and are not generated from actual infrastructure signals. For PostgreSQL, run `alembic upgrade head` first and use a dedicated development database; never run demo seeding against production.
+
+
+## Production database preflight
+
+Before routing production traffic to a new deployment, verify that the configured
+PostgreSQL database is reachable and its Alembic revision matches the migrations
+in this checkout:
+
+```bash
+cd backend
+python -m scripts.check_database
+```
+
+The command reads `DATABASE_URL` from the environment (or local `.env`), runs
+`SELECT 1`, and compares the database's current Alembic revision with the
+repository's migration heads. It exits non-zero if the database is unreachable
+or migrations are missing. It intentionally does not print the connection URL
+or raw database-driver error text.
+
+For Supabase, use the connection URI appropriate for the deployment network
+(pooler or direct connection), ensure the username/database pair matches the
+selected connection mode, and configure SSL as required by the Supabase
+connection settings. Store the full URI only in the hosting provider's secret
+environment variables; never commit it to Git.
